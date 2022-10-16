@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP A4954ELPTR-T
+D Dual DMOS Full Bridge Motor Driver
+K
+F https://datasheet.datasheetarchive.com/originals/distributors/Datasheets-DGA5/485249.pdf
+$ENDCMP
+#
+#End Doc Library
