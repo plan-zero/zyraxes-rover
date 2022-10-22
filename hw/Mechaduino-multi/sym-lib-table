@@ -1,3 +1,4 @@
 (sym_lib_table
-  (lib (name a4954)(type Legacy)(uri /home/ame/Desktop/pcb/planzero-enc/Mechaduino-planzero/lib/A4954ELPTR-T.lib)(options "")(descr ""))
+  (lib (name "a4954")(type "Legacy")(uri "/home/ame/Desktop/pcb/planzero-enc/Mechaduino-planzero/lib/A4954ELPTR-T.lib")(options "")(descr ""))
+  (lib (name "Mechaduino-planzero-rescue")(type "Legacy")(uri "${KIPRJMOD}/Mechaduino-planzero-rescue.lib")(options "")(descr ""))
 )
