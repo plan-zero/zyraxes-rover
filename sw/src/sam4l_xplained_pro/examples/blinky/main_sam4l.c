@@ -236,6 +236,7 @@ int main(void)
 	puts(STRING_HEADER);
 
 	/* Configure systick for 1 ms */
+	puts("Plan Zero blinky example \r\n");
 	puts("Configure system tick to get 1ms tick period.\r");
 	if (SysTick_Config(sysclk_get_cpu_hz() / BLINK_PERIOD)) {
 		puts("-F- Systick configuration error\r");

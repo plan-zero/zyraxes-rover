@@ -61,7 +61,6 @@ CSRCS = \
        common/utils/interrupt/interrupt_sam_nvic.c        \
        common/utils/stdio/read.c                          \
        common/utils/stdio/write.c                         \
-       sam/applications/getting-started/main_sam4l.c      \
        sam/boards/sam4l_xplained_pro/init.c               \
        sam/drivers/bpm/bpm.c                              \
        sam/drivers/eic/eic.c                              \
@@ -72,7 +71,8 @@ CSRCS = \
        sam/utils/cmsis/sam4l/source/templates/exceptions.c \
        sam/utils/cmsis/sam4l/source/templates/gcc/startup_sam4l.c \
        sam/utils/cmsis/sam4l/source/templates/system_sam4l.c \
-       sam/utils/syscalls/gcc/syscalls.c
+       sam/utils/syscalls/gcc/syscalls.c \
+       ../src/sam4l_xplained_pro/examples/blinky/main_sam4l.c
 
 # List of assembler source files.
 ASSRCS = 
