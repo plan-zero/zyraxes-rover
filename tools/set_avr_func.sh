@@ -64,37 +64,6 @@ if [ "$1" == "WSL" ]; then
         echo '}' >> ~/.bashrc
     fi
 
-    ##install avr_ota_push
-    if grep -q "avr_ota_push" ~/.bashrc; then
-        echo "avr_ota_push is already installed!"
-    else
-        echo "Install avr_ota_push!"
-        if [ -f "$avrdude_win32/find_ftdi.cmd" ]; then
-            echo "find_ftdi.cmd already exists"
-        else
-            cp ./win32/find_ftdi.cmd $avrdude_win32/.
-        fi
-        #check python3
-        out=$(command -V python3)
-        if [[ $out == *"python3 is"* ]]; then
-            ##generate code
-            flash_tool_path=$(pwd)/flash_tool/flash-tool.py
-            echo 'avr_ota_push() {' >> ~/.bashrc
-            echo 'cmd.exe -cmd /K "cd C:\avrdude & START /WAIT /B find_ftdi.cmd Serial0 /all > out.txt  & exit"' >> ~/.bashrc
-            echo 'com_port=$(cat /mnt/c/avrdude/out.txt)' >> ~/.bashrc
-            echo 'tty_port=/dev/ttyS${com_port:3:1}' >> ~/.bashrc
-            echo 'if [ -z "$3" ]; then' >> ~/.bashrc
-            echo "    python3 $flash_tool_path -T \$2 -H \$1 -P \$tty_port -B 1152000 " >> ~/.bashrc
-            echo 'else' >> ~/.bashrc
-            echo "    python3 $flash_tool_path -T \$2 -H \$1 -K \$3 -P /dev/\$usb_dev -B 1152000 " >> ~/.bashrc
-            echo 'fi' >> ~/.bashrc
-            echo '}' >> ~/.bashrc
-        else
-            echo "python3 not found, please run apt-get install python3!"
-        fi
-
-    fi
-
 
 else
     if [[ $out == *"avrdude is"* ]]; then
@@ -122,29 +91,6 @@ else
             echo '}' >> ~/.bashrc
         fi
 
-        ##install avr_ota_push
-        if grep -q "avr_ota_push" ~/.bashrc; then
-            echo "avr_ota_push is already installed!"
-        else
-            echo "Install avr_ota_push!"
-            #check python3
-            out=$(command -V python3)
-            if [[ $out == *"python3 is"* ]]; then
-                ##generate code
-                flash_tool_path=$(pwd)/flash_tool/flash-tool.py
-                echo 'avr_ota_push() {' >> ~/.bashrc
-                echo "usb_dev=\$(dmesg | grep \"FTDI USB Serial Device converter now attached\" | grep -Eo 'ttyUSB[0-9]+')" >> ~/.bashrc
-                echo 'if [ -z "$3" ]; then' >> ~/.bashrc
-                echo "    python3 $flash_tool_path -T \$2 -H \$1 -P /dev/\$usb_dev -B 576000 " >> ~/.bashrc
-                echo 'else' >> ~/.bashrc
-                echo "    python3 $flash_tool_path -T \$2 -H \$1 -K \$3 -P /dev/\$usb_dev -B 576000 " >> ~/.bashrc
-                echo 'fi' >> ~/.bashrc
-                echo '}' >> ~/.bashrc
-            else
-                echo "python3 not found, please run apt-get install python3!"
-            fi
-
-        fi
 
         ##check if the functions are already installed
     else
