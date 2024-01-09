@@ -1,0 +1,3 @@
+[submodule "sw/asf"]
+	path = sw/asf
+	url = https://github.com/plan-zero/asf.git
