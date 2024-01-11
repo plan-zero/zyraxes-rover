@@ -26,7 +26,6 @@
 #include <avr/interrupt.h>
 
 
-
 /* USI port and pin definitions.
  */
 #define USI_OUT_REG	PORTA	//!< USI port output register.
@@ -36,6 +35,16 @@
 #define USI_DATAIN_PIN	PA6	//!< USI data input pin.
 #define USI_DATAOUT_PIN	PA5	//!< USI data output pin.
 
+#define USI_CS_DIR    DDRB
+#define USI_CS_PORT   PORTB
+#define USI_CS_IN_REG PINB
+#ifdef CS_RESET
+#define USI_CS_PIN  PB3
+#define USI_PCINT PCINT11
+#else
+#define USI_CS_PIN  PB1
+#define USI_PCINT PCINT9
+#endif
 
 
 
@@ -89,10 +98,21 @@ struct usidriverStatus_t {
 	unsigned char masterMode : 1;       //!< True if in master mode.
 	unsigned char transferComplete : 1; //!< True when transfer completed.
 	unsigned char writeCollision : 1;   //!< True if put attempted during transfer.
+	unsigned char cs_assert : 1; //!< True if in slaveMode and CS is asserted by master.
 };
 
 volatile struct usidriverStatus_t spiX_status; //!< The driver status bits.
 
+
+ISR(PCINT1_vect)
+{
+	//read back the pin value to see if that is low
+	if( (USI_CS_IN_REG & (1<<USI_CS_PIN)) == 0)
+		spiX_status.cs_assert = 1;
+	else
+		spiX_status.cs_assert = 0;
+
+}
 
 
 /*! \brief  Timer/Counter 0 Compare Match Interrupt handler.
@@ -184,6 +204,13 @@ void spiX_initslave( char spi_mode )
 	USI_DIR_REG |= (1<<USI_DATAOUT_PIN);                      // Outputs.
 	USI_DIR_REG &= ~(1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN); // Inputs.
 	USI_OUT_REG |= (1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN);  // Pull-ups.
+
+	// Configure CS as slave
+	USI_CS_DIR &= ~(1<<USI_CS_PIN);
+	USI_CS_PORT |= (1<<USI_CS_PIN);
+	GIMSK |= (1<<PCIE1);
+	PCMSK1 |= (1<< USI_PCINT);
+	
 	
 	// Configure USI to 3-wire slave mode with overflow interrupt.
 	USICR = (1<<USIOIE) | (1<<USIWM0) |
@@ -193,6 +220,7 @@ void spiX_initslave( char spi_mode )
 	spiX_status.masterMode       = 0;
 	spiX_status.transferComplete = 0;
 	spiX_status.writeCollision   = 0;
+	spiX_status.cs_assert = 0;
 	
 	storedUSIDR = 0;
 }
@@ -249,6 +277,10 @@ unsigned char spiX_get()
 	return storedUSIDR;
 }
 
+unsigned char spiX_start_transfer()
+{
+	return spiX_status.cs_assert;
+}
 
 
 /*! \brief  Wait for transfer to complete.

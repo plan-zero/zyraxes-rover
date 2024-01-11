@@ -398,7 +398,6 @@ static void spi_slave_initialize(void)
 	spi_set_slave_mode(SPI_SLAVE_BASE);
 	spi_disable_mode_fault_detect(SPI_SLAVE_BASE);
 	spi_set_peripheral_chip_select_value(SPI_SLAVE_BASE, SPI_CHIP_PCS);
-	spi_disable_peripheral_select_decode(SPI_SLAVE_BASE);
 	spi_set_clock_polarity(SPI_SLAVE_BASE, SPI_CHIP_SEL, SPI_CLK_POLARITY);
 	spi_set_clock_phase(SPI_SLAVE_BASE, SPI_CHIP_SEL, SPI_CLK_PHASE);
 	spi_set_bits_per_transfer(SPI_SLAVE_BASE, SPI_CHIP_SEL, SPI_CSR_BITS_8_BIT);

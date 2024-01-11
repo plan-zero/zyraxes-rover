@@ -25,5 +25,6 @@ void spiX_initslave(char spi_mode);
 char spiX_put(unsigned char val);
 unsigned char spiX_get();
 void spiX_wait();
+unsigned char spiX_start_transfer();
 
 #endif /*SPI_DRIVER_H*/
