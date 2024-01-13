@@ -117,10 +117,10 @@ extern "C" {
 #define SPI_CLK_PHASE 1
 
 /* Delay before SPCK. */
-#define SPI_DLYBS 200
+#define SPI_DLYBS 0x80
 
 /* Delay between consecutive transfers. */
-#define SPI_DLYBCT 0x80
+#define SPI_DLYBCT 0x40
 
 #define CHIPSELECT_HIGH() ioport_set_pin_level(PIN_PB12, IOPORT_PIN_LEVEL_HIGH)
 #define CHIPSELECT_LOW()  ioport_set_pin_level(PIN_PB12, IOPORT_PIN_LEVEL_LOW)
