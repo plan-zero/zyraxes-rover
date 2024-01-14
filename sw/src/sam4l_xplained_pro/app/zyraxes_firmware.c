@@ -174,7 +174,10 @@ static void spi_master_initialize(void)
 	spi_set_lastxfer(SPI_MASTER_BASE);
 	spi_set_master_mode(SPI_MASTER_BASE);
 	spi_disable_mode_fault_detect(SPI_MASTER_BASE);
+
+	//spi_enable_peripheral_select_decode(SPI_MASTER_BASE);
 	spi_set_peripheral_chip_select_value(SPI_MASTER_BASE, SPI_CHIP_PCS);
+	
 	spi_set_clock_polarity(SPI_MASTER_BASE, SPI_CHIP_SEL, SPI_CLK_POLARITY);
 	spi_set_clock_phase(SPI_MASTER_BASE, SPI_CHIP_SEL, SPI_CLK_PHASE);
 	spi_set_bits_per_transfer(SPI_MASTER_BASE, SPI_CHIP_SEL,
@@ -218,12 +221,14 @@ static void spi_master_transfer(void *p_buf, uint32_t size)
 	}
 }*/
 
+#define SPI_TIMEOUT_READ 100000 // timeout for SPI (TBD: exagerated, do some measurments and lower this)
+
 void readEncoderDiagnostics()
 {
 	long angleTemp = 0;
 	uint16_t data = 0;
 	uint8_t uc_pcs;
-
+	uint32_t timeout;
 	
 	CHIPSELECT_LOW(); //digitalWrite(chipSelectPin, LOW);
 
@@ -234,9 +239,18 @@ void readEncoderDiagnostics()
 	puts("See AS5047 datasheet for details \n\r\r");
 
 
-	
-	spi_write(SPI_MASTER_BASE, 0xFFFC, 0, 0); //0xFFFC
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0);
+	spi_write(SPI_MASTER_BASE, 0xFFFC, SPI_CHIP_PCS, 0); //0xFFFC
+	timeout = 0;
+	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
+	{
+		delay_us(10);
+		timeout++;
+	}
+	if(timeout >= SPI_TIMEOUT_READ)
+	{
+		puts("Timeout error: AS5047!\n\r");
+		return;
+	}
 
 
 	CHIPSELECT_HIGH();
@@ -244,11 +258,20 @@ void readEncoderDiagnostics()
 	CHIPSELECT_LOW();
 
 	// 0xC000
-	spi_write(SPI_MASTER_BASE, 0xC000, 0, 0);
+	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS, 0);
 	/* Wait transfer done. */
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0);
+	timeout = 0;
+	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
+	{
+		delay_us(10);
+		timeout++;
+	}
+	if(timeout >= SPI_TIMEOUT_READ)
+	{
+		puts("Timeout error: AS5047!\n\r");
+		return;
+	}
 	spi_read(SPI_MASTER_BASE, &data, &uc_pcs);
-
 
 	puts("Check DIAAGC register (0x3FFC) ...  n\r\r");
 
@@ -274,16 +297,36 @@ void readEncoderDiagnostics()
   	CHIPSELECT_LOW();    //digitalWrite(chipSelectPin, LOW);
 
 	//4001
-	spi_write(SPI_MASTER_BASE, 0x4001, 0, 0);
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0);
+	spi_write(SPI_MASTER_BASE, 0x4001, SPI_CHIP_PCS, 0);
+	timeout = 0;
+	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
+	{
+		delay_us(10);
+		timeout++;
+	}
+	if(timeout >= SPI_TIMEOUT_READ)
+	{
+		puts("Timeout error: AS5047!\n\r");
+		return;
+	}
 
   	CHIPSELECT_HIGH();   //digitalWrite(chipSelectPin, HIGH);
   	delay_ms(1);
   	CHIPSELECT_LOW();    //digitalWrite(chipSelectPin, LOW);
 	//0xC000
-	spi_write(SPI_MASTER_BASE, 0xC000, 0, 0);
+	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS, 0);
 	/* Wait transfer done. */
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0);
+	timeout = 0;
+	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
+	{
+		delay_us(10);
+		timeout++;
+	}
+	if(timeout >= SPI_TIMEOUT_READ)
+	{
+		puts("Timeout error: AS5047!\n\r");
+		return;
+	}
 	spi_read(SPI_MASTER_BASE, &data, &uc_pcs);
 
 

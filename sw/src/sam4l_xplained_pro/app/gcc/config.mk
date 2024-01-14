@@ -91,7 +91,6 @@ INC_PATH = \
        sam/drivers/bpm                                    \
        sam/drivers/flashcalw                              \
        sam/drivers/spi                                    \
-       sam/drivers/spi/example/sam4lc4c_sam4l_xplained_pro \
        sam/drivers/usart                                  \
        sam/drivers/wdt                                    \
        sam/utils                                          \
@@ -101,7 +100,8 @@ INC_PATH = \
        sam/utils/preprocessor                             \
        thirdparty/CMSIS/Include                           \
        thirdparty/CMSIS/Lib/GCC \
-       sam/drivers/spi/example/sam4lc4c_sam4l_xplained_pro/gcc
+       sam/drivers/spi/example/sam4lc4c_sam4l_xplained_pro/gcc \
+       ../src/sam4l_xplained_pro/app/config
 
 # Additional search paths for libraries.
 LIB_PATH =  \
