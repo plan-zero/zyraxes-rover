@@ -37,7 +37,7 @@
 #
 
 # Path to top level ASF directory relative to this project directory.
-PRJ_PATH = ../../../../../asf
+PRJ_PATH = ../../../../asf
 
 # Target CPU architecture: cortex-m3, cortex-m4
 ARCH = cortex-m4
