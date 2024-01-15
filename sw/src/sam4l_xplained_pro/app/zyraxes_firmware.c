@@ -98,6 +98,12 @@
 #include <ioport.h>
 #endif
 
+#define ioport_set_pin_peripheral_mode(pin, mode) \
+	do {\
+		ioport_set_pin_mode(pin, mode);\
+		ioport_disable_pin(pin);\
+	} while (0)
+
 /// @cond 0
 /**INDENT-OFF**/
 #ifdef __cplusplus
@@ -109,10 +115,12 @@ extern "C" {
 /* Chip select. */
 #define SPI_CHIP_SEL_0 0
 #define SPI_CHIP_SEL_1 1
+#define SPI_CHIP_SEL_2 2
+#define SPI_CHIP_SEL_3 3
 
 
-#define SPI_CHIP_PCS_1 0x5//spi_get_pcs(SPI_CHIP_SEL_1)
-#define SPI_CHIP_PCS_0 0x6//spi_get_pcs(SPI_CHIP_SEL_0)
+#define SPI_CHIP_PCS_1 0x0D//spi_get_pcs(SPI_CHIP_SEL_1)
+#define SPI_CHIP_PCS_0 0x0E//spi_get_pcs(SPI_CHIP_SEL_0)
 
 /* Clock polarity. */
 #define SPI_CLK_POLARITY 0
@@ -216,6 +224,42 @@ static void spi_master_initialize(void)
 			/ gs_ul_spi_clock));
 	spi_set_transfer_delay(SPI_MASTER_BASE, SPI_CHIP_SEL_1, SPI_DLYBS,
 			SPI_DLYBCT);
+
+	//CS2 devices
+	spi_configure_cs_behavior(SPI_MASTER_BASE, SPI_CHIP_SEL_2, SPI_CS_RISE_NO_TX);
+	spi_set_clock_polarity(SPI_MASTER_BASE, SPI_CHIP_SEL_2, SPI_CLK_POLARITY);
+	spi_set_clock_phase(SPI_MASTER_BASE, SPI_CHIP_SEL_2, SPI_CLK_PHASE);
+	spi_set_bits_per_transfer(SPI_MASTER_BASE, SPI_CHIP_SEL_2,
+			SPI_CSR_BITS_8_BIT);
+	spi_set_baudrate_div(SPI_MASTER_BASE, SPI_CHIP_SEL_2,
+			(
+#if (SAM4L)
+			sysclk_get_pba_hz()
+#else
+			sysclk_get_peripheral_hz()
+#endif
+			/ gs_ul_spi_clock));
+	spi_set_transfer_delay(SPI_MASTER_BASE, SPI_CHIP_SEL_2, SPI_DLYBS,
+			SPI_DLYBCT);
+
+
+	//CS3 devices
+	spi_configure_cs_behavior(SPI_MASTER_BASE, SPI_CHIP_SEL_3, SPI_CS_RISE_NO_TX);
+	spi_set_clock_polarity(SPI_MASTER_BASE, SPI_CHIP_SEL_3, SPI_CLK_POLARITY);
+	spi_set_clock_phase(SPI_MASTER_BASE, SPI_CHIP_SEL_3, SPI_CLK_PHASE);
+	spi_set_bits_per_transfer(SPI_MASTER_BASE, SPI_CHIP_SEL_3,
+			SPI_CSR_BITS_8_BIT);
+	spi_set_baudrate_div(SPI_MASTER_BASE, SPI_CHIP_SEL_3,
+			(
+#if (SAM4L)
+			sysclk_get_pba_hz()
+#else
+			sysclk_get_peripheral_hz()
+#endif
+			/ gs_ul_spi_clock));
+	spi_set_transfer_delay(SPI_MASTER_BASE, SPI_CHIP_SEL_3, SPI_DLYBS,
+			SPI_DLYBCT);
+
 
 	spi_enable(SPI_MASTER_BASE);
 }
@@ -462,6 +506,9 @@ int main(void)
 	//INIT CS for Encoder
 	ioport_set_pin_dir(PIN_PB12,IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(PIN_PB12, IOPORT_PIN_LEVEL_HIGH);
+
+	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
+		MUX_PC01A_SPI_NPCS3);
 
 	/* Display menu. */
 	display_menu();
