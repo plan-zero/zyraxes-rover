@@ -107,8 +107,12 @@ extern "C" {
 /// @endcond
 
 /* Chip select. */
-#define SPI_CHIP_SEL 0
-#define SPI_CHIP_PCS spi_get_pcs(SPI_CHIP_SEL)
+#define SPI_CHIP_SEL_0 0
+#define SPI_CHIP_SEL_1 1
+
+
+#define SPI_CHIP_PCS_1 0x5//spi_get_pcs(SPI_CHIP_SEL_1)
+#define SPI_CHIP_PCS_0 0x6//spi_get_pcs(SPI_CHIP_SEL_0)
 
 /* Clock polarity. */
 #define SPI_CLK_POLARITY 0
@@ -149,6 +153,7 @@ static void display_menu(void)
 			"------\r");
 
 	puts("  m: Re-initialize SPI Master\n\r"
+		 "  a: Attiny24 DIAG\n\r"
 		 "  d: Magnetic Sensor DIAG\n\r"
 		 "  h: Display this menu again\n\r\r");
 }
@@ -175,14 +180,16 @@ static void spi_master_initialize(void)
 	spi_set_master_mode(SPI_MASTER_BASE);
 	spi_disable_mode_fault_detect(SPI_MASTER_BASE);
 
-	//spi_enable_peripheral_select_decode(SPI_MASTER_BASE);
-	spi_set_peripheral_chip_select_value(SPI_MASTER_BASE, SPI_CHIP_PCS);
+	spi_enable_peripheral_select_decode(SPI_MASTER_BASE);
+	spi_set_variable_peripheral_select(SPI_MASTER_BASE);
 	
-	spi_set_clock_polarity(SPI_MASTER_BASE, SPI_CHIP_SEL, SPI_CLK_POLARITY);
-	spi_set_clock_phase(SPI_MASTER_BASE, SPI_CHIP_SEL, SPI_CLK_PHASE);
-	spi_set_bits_per_transfer(SPI_MASTER_BASE, SPI_CHIP_SEL,
+	//configure CS0 AS5047
+	spi_configure_cs_behavior(SPI_MASTER_BASE, SPI_CHIP_SEL_0, SPI_CS_RISE_NO_TX);
+	spi_set_clock_polarity(SPI_MASTER_BASE, SPI_CHIP_SEL_0, SPI_CLK_POLARITY);
+	spi_set_clock_phase(SPI_MASTER_BASE, SPI_CHIP_SEL_0, SPI_CLK_PHASE);
+	spi_set_bits_per_transfer(SPI_MASTER_BASE, SPI_CHIP_SEL_0,
 			SPI_CSR_BITS_8_BIT);
-	spi_set_baudrate_div(SPI_MASTER_BASE, SPI_CHIP_SEL,
+	spi_set_baudrate_div(SPI_MASTER_BASE, SPI_CHIP_SEL_0,
 			(
 #if (SAM4L)
 			sysclk_get_pba_hz()
@@ -190,8 +197,26 @@ static void spi_master_initialize(void)
 			sysclk_get_peripheral_hz()
 #endif
 			/ gs_ul_spi_clock));
-	spi_set_transfer_delay(SPI_MASTER_BASE, SPI_CHIP_SEL, SPI_DLYBS,
+	spi_set_transfer_delay(SPI_MASTER_BASE, SPI_CHIP_SEL_0, SPI_DLYBS,
 			SPI_DLYBCT);
+
+	//configure CS1 attiny24
+	spi_configure_cs_behavior(SPI_MASTER_BASE, SPI_CHIP_SEL_1, SPI_CS_RISE_NO_TX);
+	spi_set_clock_polarity(SPI_MASTER_BASE, SPI_CHIP_SEL_1, SPI_CLK_POLARITY);
+	spi_set_clock_phase(SPI_MASTER_BASE, SPI_CHIP_SEL_1, SPI_CLK_PHASE);
+	spi_set_bits_per_transfer(SPI_MASTER_BASE, SPI_CHIP_SEL_1,
+			SPI_CSR_BITS_8_BIT);
+	spi_set_baudrate_div(SPI_MASTER_BASE, SPI_CHIP_SEL_1,
+			(
+#if (SAM4L)
+			sysclk_get_pba_hz()
+#else
+			sysclk_get_peripheral_hz()
+#endif
+			/ gs_ul_spi_clock));
+	spi_set_transfer_delay(SPI_MASTER_BASE, SPI_CHIP_SEL_1, SPI_DLYBS,
+			SPI_DLYBCT);
+
 	spi_enable(SPI_MASTER_BASE);
 }
 
@@ -223,6 +248,29 @@ static void spi_master_transfer(void *p_buf, uint32_t size)
 
 #define SPI_TIMEOUT_READ 100000 // timeout for SPI (TBD: exagerated, do some measurments and lower this)
 
+
+void readAttiny24Diagnostics()
+{
+
+	uint32_t timeout = 0;
+	uint16_t data = 0;
+	uint8_t uc_pcs;
+	spi_write(SPI_MASTER_BASE, 0x1010, SPI_CHIP_PCS_1, 1);
+
+	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
+	{
+		delay_us(10);
+		timeout++;
+	}
+	if(timeout >= SPI_TIMEOUT_READ)
+	{
+		puts("Timeout error: attiny24");
+		return;
+	}
+	spi_read(SPI_MASTER_BASE, &data, &uc_pcs);
+	printf("ATTINY response: 0x%x\n\r", data);
+}
+
 void readEncoderDiagnostics()
 {
 	long angleTemp = 0;
@@ -239,7 +287,7 @@ void readEncoderDiagnostics()
 	puts("See AS5047 datasheet for details \n\r\r");
 
 
-	spi_write(SPI_MASTER_BASE, 0xFFFC, SPI_CHIP_PCS, 0); //0xFFFC
+	spi_write(SPI_MASTER_BASE, 0xFFFC, SPI_CHIP_PCS_0, 0); //0xFFFC
 	timeout = 0;
 	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
 	{
@@ -258,7 +306,7 @@ void readEncoderDiagnostics()
 	CHIPSELECT_LOW();
 
 	// 0xC000
-	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS, 0);
+	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS_0, 0);
 	/* Wait transfer done. */
 	timeout = 0;
 	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
@@ -297,7 +345,7 @@ void readEncoderDiagnostics()
   	CHIPSELECT_LOW();    //digitalWrite(chipSelectPin, LOW);
 
 	//4001
-	spi_write(SPI_MASTER_BASE, 0x4001, SPI_CHIP_PCS, 0);
+	spi_write(SPI_MASTER_BASE, 0x4001, SPI_CHIP_PCS_0, 0);
 	timeout = 0;
 	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
 	{
@@ -314,7 +362,7 @@ void readEncoderDiagnostics()
   	delay_ms(1);
   	CHIPSELECT_LOW();    //digitalWrite(chipSelectPin, LOW);
 	//0xC000
-	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS, 0);
+	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS_0, 0);
 	/* Wait transfer done. */
 	timeout = 0;
 	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
@@ -432,7 +480,9 @@ int main(void)
 		case 'd':
 			readEncoderDiagnostics();
 			break;
-
+		case 'a':
+			readAttiny24Diagnostics();
+			break;
 		default:
 			break;
 		}
