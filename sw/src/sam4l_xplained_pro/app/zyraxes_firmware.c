@@ -164,6 +164,7 @@ static void display_menu(void)
 		 "  a: Attiny24 DIAG\n\r"
 		 "  b: Attiny24 Motor Test\n\r"
 		 "  d: Magnetic Sensor DIAG\n\r"
+		 "  f: Magnetic Sensor READ\n\r"
 		 "  h: Display this menu again\n\r\r");
 }
 
@@ -294,13 +295,13 @@ static void spi_master_transfer(void *p_buf, uint32_t size)
 #define SPI_TIMEOUT_READ 100000 // timeout for SPI (TBD: exagerated, do some measurments and lower this)
 
 
-uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs)
+uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last)
 {
 	uint32_t timeout = 0;
 	uint16_t out_data = 0;
 	uint8_t uc_pcs;
 
-	spi_write(SPI_MASTER_BASE, in_data, cs, 1);
+	spi_write(SPI_MASTER_BASE, in_data, cs, last);
 	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
 	{
 		delay_us(10);
@@ -322,9 +323,9 @@ void readAttiny24Diagnostics()
 	uint8_t data = 0;
 
 	//sync with attiny24
-	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1);
+	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1, 1);
 	response |= data;
-	data = spi_8bit_sync_transfer(0x20, SPI_CHIP_PCS_1);
+	data = spi_8bit_sync_transfer(0x20, SPI_CHIP_PCS_1, 1);
 	response |= (data << 8);
 
 	printf("ATTINY response: 0x%lx\n\r", response);
@@ -337,32 +338,45 @@ void setAttiny24Motor(uint8_t pwmA, uint8_t pwmB)
 	uint8_t data = 0;
 
 	//sync with attiny24
-	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1);
+	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1, 1);
 	response |= (data << 8);
-	data = spi_8bit_sync_transfer(0x30, SPI_CHIP_PCS_1);
+	data = spi_8bit_sync_transfer(0x30, SPI_CHIP_PCS_1, 1);
 	response |= data ;
 
 	
 	printf("ATTINY response 1: 0x%lx\n\r", response);
 	response = 0;
 
-	data = spi_8bit_sync_transfer(pwmA, SPI_CHIP_PCS_1);
+	data = spi_8bit_sync_transfer(pwmA, SPI_CHIP_PCS_1, 1);
 	response |= data << 8;
-	data = spi_8bit_sync_transfer(pwmB, SPI_CHIP_PCS_1);
+	data = spi_8bit_sync_transfer(pwmB, SPI_CHIP_PCS_1, 1);
 	response |= data;
 
 	printf("ATTINY response 2: 0x%lx\n\r", response);
 }
 
 
+void readEncoder()
+{
+  long angleTemp;
+  uint8_t b1 = 0, b2 = 0;
+
+  b1 = spi_8bit_sync_transfer(0xFF, SPI_CHIP_PCS_0, 0);
+  b2 = spi_8bit_sync_transfer(0xFF, SPI_CHIP_PCS_0, 1);
+
+  angleTemp = (((b1 << 8) | b2) & 0B0011111111111111);
+
+  printf("Magnetic RAW: %lu \n\r", angleTemp);
+}
+
 void readEncoderDiagnostics()
 {
 	long angleTemp = 0;
 	uint16_t data = 0;
 	uint8_t uc_pcs;
-	uint32_t timeout;
+	uint8_t b1 = 0, b2 = 0;
 	
-	CHIPSELECT_LOW(); //digitalWrite(chipSelectPin, LOW);
+	
 
 	///////////////////////////////////////////////READ DIAAGC (0x3FFC)
 	puts("------------------------------------------------ \n\r");
@@ -371,39 +385,15 @@ void readEncoderDiagnostics()
 	puts("See AS5047 datasheet for details \n\r\r");
 
 
-	spi_write(SPI_MASTER_BASE, 0xFFFC, SPI_CHIP_PCS_0, 0); //0xFFFC
-	timeout = 0;
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
-	{
-		delay_us(10);
-		timeout++;
-	}
-	if(timeout >= SPI_TIMEOUT_READ)
-	{
-		puts("Timeout error: AS5047!\n\r");
-		return;
-	}
+	spi_8bit_sync_transfer(0xFF, SPI_CHIP_PCS_0, 0);
+	spi_8bit_sync_transfer(0xFC, SPI_CHIP_PCS_0, 1);
 
-
-	CHIPSELECT_HIGH();
 	delay_ms(1);
-	CHIPSELECT_LOW();
 
-	// 0xC000
-	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS_0, 0);
-	/* Wait transfer done. */
-	timeout = 0;
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
-	{
-		delay_us(10);
-		timeout++;
-	}
-	if(timeout >= SPI_TIMEOUT_READ)
-	{
-		puts("Timeout error: AS5047!\n\r");
-		return;
-	}
-	spi_read(SPI_MASTER_BASE, &data, &uc_pcs);
+	b1 = spi_8bit_sync_transfer(0xC0, SPI_CHIP_PCS_0, 0);
+	b2 = spi_8bit_sync_transfer(0x00, SPI_CHIP_PCS_0, 1);
+
+	data = ((b1 << 8) | b2);
 
 	puts("Check DIAAGC register (0x3FFC) ...  n\r\r");
 
@@ -424,43 +414,20 @@ void readEncoderDiagnostics()
   	puts("\n\r");
 
 
-  	CHIPSELECT_HIGH();   //digitalWrite(chipSelectPin, HIGH);
+
   	delay_ms(1);
-  	CHIPSELECT_LOW();    //digitalWrite(chipSelectPin, LOW);
+
 
 	//4001
-	spi_write(SPI_MASTER_BASE, 0x4001, SPI_CHIP_PCS_0, 0);
-	timeout = 0;
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
-	{
-		delay_us(10);
-		timeout++;
-	}
-	if(timeout >= SPI_TIMEOUT_READ)
-	{
-		puts("Timeout error: AS5047!\n\r");
-		return;
-	}
+	spi_8bit_sync_transfer(0x40, SPI_CHIP_PCS_0, 0);
+	spi_8bit_sync_transfer(0x01, SPI_CHIP_PCS_0, 1);
 
-  	CHIPSELECT_HIGH();   //digitalWrite(chipSelectPin, HIGH);
+
   	delay_ms(1);
-  	CHIPSELECT_LOW();    //digitalWrite(chipSelectPin, LOW);
-	//0xC000
-	spi_write(SPI_MASTER_BASE, 0xC000, SPI_CHIP_PCS_0, 0);
-	/* Wait transfer done. */
-	timeout = 0;
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
-	{
-		delay_us(10);
-		timeout++;
-	}
-	if(timeout >= SPI_TIMEOUT_READ)
-	{
-		puts("Timeout error: AS5047!\n\r");
-		return;
-	}
-	spi_read(SPI_MASTER_BASE, &data, &uc_pcs);
 
+	b1 = spi_8bit_sync_transfer(0xC0, SPI_CHIP_PCS_0 ,0);
+	b2 = spi_8bit_sync_transfer(0x00, SPI_CHIP_PCS_0 ,1);
+	data = ((b1 << 8) | b2);
 
   	puts("Check ERRFL register (0x0001) ...  \n\r\r");
 
@@ -483,8 +450,6 @@ void readEncoderDiagnostics()
   	if (!((angleTemp & (1 << 14)) | (angleTemp & (1 << 2)) | (angleTemp & (1 << 1)) | (angleTemp & (1 << 0))))  puts("Looks good! \n\r");
 
   	puts("\n\r");
-
-  	CHIPSELECT_HIGH();   //digitalWrite(chipSelectPin, HIGH);
 
 
   	delay_ms(1);
@@ -573,6 +538,8 @@ int main(void)
 		case 'b':
 			setAttiny24Motor(50,60);
 			break;
+		case 'f':
+			readEncoder();
 		default:
 			break;
 		}
