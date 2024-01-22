@@ -162,6 +162,7 @@ static void display_menu(void)
 
 	puts("  m: Re-initialize SPI Master\n\r"
 		 "  a: Attiny24 DIAG\n\r"
+		 "  b: Attiny24 Motor Test\n\r"
 		 "  d: Magnetic Sensor DIAG\n\r"
 		 "  h: Display this menu again\n\r\r");
 }
@@ -293,14 +294,13 @@ static void spi_master_transfer(void *p_buf, uint32_t size)
 #define SPI_TIMEOUT_READ 100000 // timeout for SPI (TBD: exagerated, do some measurments and lower this)
 
 
-void readAttiny24Diagnostics()
+uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs)
 {
-
 	uint32_t timeout = 0;
-	uint16_t data = 0;
+	uint16_t out_data = 0;
 	uint8_t uc_pcs;
-	spi_write(SPI_MASTER_BASE, 0x1010, SPI_CHIP_PCS_1, 1);
 
+	spi_write(SPI_MASTER_BASE, in_data, cs, 1);
 	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
 	{
 		delay_us(10);
@@ -308,12 +308,52 @@ void readAttiny24Diagnostics()
 	}
 	if(timeout >= SPI_TIMEOUT_READ)
 	{
-		puts("Timeout error: attiny24");
-		return;
+		printf("Timeout error: 0x%x", cs);
+		return -1;
 	}
-	spi_read(SPI_MASTER_BASE, &data, &uc_pcs);
-	printf("ATTINY response: 0x%x\n\r", data);
+	spi_read(SPI_MASTER_BASE, &out_data, &uc_pcs);
+	return out_data;
 }
+
+void readAttiny24Diagnostics()
+{
+
+	uint32_t response = 0;
+	uint8_t data = 0;
+
+	//sync with attiny24
+	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1);
+	response |= data;
+	data = spi_8bit_sync_transfer(0x20, SPI_CHIP_PCS_1);
+	response |= (data << 8);
+
+	printf("ATTINY response: 0x%lx\n\r", response);
+}
+
+void setAttiny24Motor(uint8_t pwmA, uint8_t pwmB)
+{
+
+	uint32_t response = 0;
+	uint8_t data = 0;
+
+	//sync with attiny24
+	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1);
+	response |= (data << 8);
+	data = spi_8bit_sync_transfer(0x30, SPI_CHIP_PCS_1);
+	response |= data ;
+
+	
+	printf("ATTINY response 1: 0x%lx\n\r", response);
+	response = 0;
+
+	data = spi_8bit_sync_transfer(pwmA, SPI_CHIP_PCS_1);
+	response |= data << 8;
+	data = spi_8bit_sync_transfer(pwmB, SPI_CHIP_PCS_1);
+	response |= data;
+
+	printf("ATTINY response 2: 0x%lx\n\r", response);
+}
+
 
 void readEncoderDiagnostics()
 {
@@ -529,6 +569,9 @@ int main(void)
 			break;
 		case 'a':
 			readAttiny24Diagnostics();
+			break;
+		case 'b':
+			setAttiny24Motor(50,60);
 			break;
 		default:
 			break;
