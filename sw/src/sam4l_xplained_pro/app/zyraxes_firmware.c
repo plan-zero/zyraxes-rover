@@ -532,7 +532,7 @@ int main(void)
 			readAttiny24Diagnostics();
 			break;
 		case 'b':
-			setAttiny24Motor(50,60);
+			setAttiny24Motor(10,200);
 			break;
 		case 'f':
 			readEncoder();

@@ -30,6 +30,7 @@ int main()
 	unsigned char slave_state = STATE_SLAVE_INIT;
 	unsigned char in_data = 0;
 	unsigned char byte_count = 0;
+	unsigned char update_regs = 0;
 
 	spiX_initslave(SPIMODE);	// Init SPI driver as slave.
 	sei();		// Must do this to make driver work.
@@ -40,6 +41,14 @@ int main()
 	master_data[1] = 0;
 	spiX_put(SLAVE_SYNC);
 	slave_state = STATE_SLAVE_SEND_SYNC;
+
+	//configure PWM
+    TCCR0A |= _BV(COM0B1) | _BV(COM0A1) | _BV(WGM01) | _BV(WGM00);
+    TCCR0B |= _BV(CS00) | _BV(CS01);
+	DDRB |= _BV(PB2);
+	DDRA |= _BV(PA7);
+    OCR0A = 0;
+    OCR0B = 0;
 
 	do {
 		
@@ -76,6 +85,7 @@ int main()
 		case STATE_SLAVE_GET_DATA:
 			if(byte_count >= 1)
 				slave_state = STATE_SLAVE_INIT;
+		    update_regs = 1;
 			master_data[byte_count] = in_data;
 			byte_count += 1;
 			spiX_put(SLAVE_SET);
@@ -92,6 +102,11 @@ int main()
 		{
 			in_data = 0;
 			byte_count = 0;
+			if(update_regs)
+			{
+				OCR0A = master_data[0];
+				OCR0B = master_data[1];
+			}
 			master_data[0] = 0;
 			master_data[1] = 0;
 			spiX_put(SLAVE_SYNC);
@@ -100,7 +115,7 @@ int main()
 
 		while(!spiX_start_transfer())//wait transfer and do idle stuff
 		{
-			//idle code where
+
 		}
 		
 		spiX_wait();		// wait for transmission to finish
