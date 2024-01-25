@@ -22,8 +22,32 @@
 #define STATE_SLAVE_GET_DATA    3
 #define STATE_SLAVE_ERROR		4
 
+#define IN1	PA0
+#define IN2 PA1
+#define IN3 PA3
+#define IN4 PA2
 
-unsigned char master_data[2] = {0};
+const unsigned char gpio_port_lut[] = 
+{
+	0x0, //0 0 0 0
+	0x1, //0 0 0 1
+	0x2, //0 0 1 0
+	0x3, //0 0 1 1
+	0x8, //0 1 0 0
+	0x9, //0 1 0 1
+	0xA, //0 1 1 0
+	0xB, //0 1 1 1
+	0x4, //1 0 0 0
+	0x5, //1 0 0 1
+	0x6, //1 0 1 0
+	0x7, //1 0 1 1
+	0xC, //1 1 0 0
+	0xD, //1 1 0 1
+	0xE, //1 1 1 0
+	0xF, //1 1 1 1
+};
+unsigned char pwm_data[2] = {0};
+unsigned char gpio_data = 0;
 
 int main()
 {
@@ -37,8 +61,9 @@ int main()
 
 	in_data = 0;
 	byte_count = 0;
-	master_data[0] = 0;
-	master_data[1] = 0;
+	pwm_data[0] = 0;
+	pwm_data[1] = 0;
+	gpio_data = 0;
 	spiX_put(SLAVE_SYNC);
 	slave_state = STATE_SLAVE_SEND_SYNC;
 
@@ -49,6 +74,9 @@ int main()
 	DDRA |= _BV(PA7);
     OCR0A = 0;
     OCR0B = 0;
+
+	//Configure IN1-4 as output
+	DDRA |= _BV(IN1) | _BV(IN2) | _BV(IN3) | _BV(IN4);
 
 	do {
 		
@@ -66,9 +94,11 @@ int main()
 			}
 		break;
 		case STATE_SLAVE_GET_CMD:
-			if(in_data == MASTER_DATA)
+			//mask the low nibble, that will contain GPIO data
+			if( (in_data & 0xF0) == MASTER_DATA)
 			{
 				//get ready to recieve data, send ACK byte
+				gpio_data = in_data & 0x0F;
 				spiX_put(SLAVE_ACK);
 				slave_state = STATE_SLAVE_GET_DATA;
 			}
@@ -86,7 +116,7 @@ int main()
 			if(byte_count >= 1)
 				slave_state = STATE_SLAVE_INIT;
 		    update_regs = 1;
-			master_data[byte_count] = in_data;
+			pwm_data[byte_count] = in_data;
 			byte_count += 1;
 			spiX_put(SLAVE_SET);
 
@@ -104,11 +134,16 @@ int main()
 			byte_count = 0;
 			if(update_regs)
 			{
-				OCR0A = master_data[0];
-				OCR0B = master_data[1];
+				OCR0A = pwm_data[0];
+				OCR0B = pwm_data[1];
+
+				PORTA &= 0xF0;
+				PORTA |= gpio_port_lut[gpio_data];
 			}
-			master_data[0] = 0;
-			master_data[1] = 0;
+			update_regs = 0;
+			pwm_data[0] = 0;
+			pwm_data[1] = 0;
+			gpio_data = 0;
 			spiX_put(SLAVE_SYNC);
 			slave_state = STATE_SLAVE_SEND_SYNC;
 		}
