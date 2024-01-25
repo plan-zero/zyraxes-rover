@@ -129,7 +129,7 @@ extern "C" {
 #define SPI_CLK_PHASE 1
 
 /* Delay before SPCK. */
-#define SPI_DLYBS 0x80
+#define SPI_DLYBS 200
 
 /* Delay between consecutive transfers. */
 #define SPI_DLYBCT 0x40
@@ -497,11 +497,6 @@ int main(void)
 	/* Output example information. */
 	puts(STRING_HEADER);
 
-	/* Configure SPI interrupts for slave only. */
-	NVIC_DisableIRQ(SPI_IRQn);
-	NVIC_ClearPendingIRQ(SPI_IRQn);
-	NVIC_SetPriority(SPI_IRQn, 0);
-	NVIC_EnableIRQ(SPI_IRQn);
 
 	spi_master_initialize();
 
@@ -517,6 +512,7 @@ int main(void)
 
 	/* Display menu. */
 	display_menu();
+
 
 	while (1) {
 		scanf("%c", (char *)&uc_key);
