@@ -107,10 +107,16 @@ volatile struct usidriverStatus_t spiX_status; //!< The driver status bits.
 ISR(PCINT1_vect)
 {
 	//read back the pin value to see if that is low
-	if( (USI_CS_IN_REG & (1<<USI_CS_PIN)) == 0)
+	if( (USI_CS_IN_REG & (1<<USI_CS_PIN)) == 0){
 		spiX_status.cs_assert = 1;
-	else
+		//enable output
+		USI_DIR_REG |= (1<<USI_DATAOUT_PIN);
+	}
+	else{
 		spiX_status.cs_assert = 0;
+		//disable output
+		USI_DIR_REG &= ~(1<<USI_DATAOUT_PIN);   
+	}
 
 }
 
@@ -201,9 +207,10 @@ void spiX_initmaster( char spi_mode )
 void spiX_initslave( char spi_mode )
 {
 	// Configure port directions.
-	USI_DIR_REG |= (1<<USI_DATAOUT_PIN);                      // Outputs.
+	//keep output disabled to allow other slaves comunicate
+	USI_DIR_REG &= ~(1<<USI_DATAOUT_PIN);                      // Outputs.
 	USI_DIR_REG &= ~(1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN); // Inputs.
-	USI_OUT_REG |= (1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN);  // Pull-ups.
+	//USI_OUT_REG |= (1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN);  // Pull-ups.
 
 	// Configure CS as slave
 	USI_CS_DIR &= ~(1<<USI_CS_PIN);
