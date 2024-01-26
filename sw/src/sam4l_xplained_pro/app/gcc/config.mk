@@ -71,7 +71,8 @@ CSRCS = \
        sam/utils/cmsis/sam4l/source/templates/gcc/startup_sam4l.c \
        sam/utils/cmsis/sam4l/source/templates/system_sam4l.c \
        sam/utils/syscalls/gcc/syscalls.c \
-       ../src/sam4l_xplained_pro/app/zyraxes_firmware.c
+       ../src/sam4l_xplained_pro/app/zyraxes_firmware.c \
+       ../src/sam4l_xplained_pro/app/constants.c
 
 # List of assembler source files.
 ASSRCS = 
@@ -101,7 +102,8 @@ INC_PATH = \
        thirdparty/CMSIS/Include                           \
        thirdparty/CMSIS/Lib/GCC \
        sam/drivers/spi/example/sam4lc4c_sam4l_xplained_pro/gcc \
-       ../src/sam4l_xplained_pro/app/config
+       ../src/sam4l_xplained_pro/app/config \
+       ../src/sam4l_xplained_pro/app
 
 # Additional search paths for libraries.
 LIB_PATH =  \
