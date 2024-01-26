@@ -72,7 +72,8 @@ CSRCS = \
        sam/utils/cmsis/sam4l/source/templates/system_sam4l.c \
        sam/utils/syscalls/gcc/syscalls.c \
        ../src/sam4l_xplained_pro/app/zyraxes_firmware.c \
-       ../src/sam4l_xplained_pro/app/constants.c
+       ../src/sam4l_xplained_pro/app/constants.c \
+       ../src/sam4l_xplained_pro/app/nvm.c
 
 # List of assembler source files.
 ASSRCS = 

@@ -98,14 +98,11 @@
 #include <ioport.h>
 #endif
 #include "constants.h"
+#include "nvm.h"
+#include "string.h"
 
 
 
-
-#define iMAX 1.0             // Be careful adjusting this.  While the A4954 driver is rated for 2.0 Amp peak currents, it cannot handle these currents continuously.  Depending on how you operate the Mechaduino, you may be able to safely raise this value...please refer to the A4954 datasheet for more info
-#define rSense 0.150
-  // 255 for 8-bit pwm, 1023 for 10 bit, must also edit analogFastWrite
-//int uMAX = 115;
 
 #define ioport_set_pin_peripheral_mode(pin, mode) \
 	do {\
@@ -197,6 +194,7 @@ static void display_menu(void)
 		 "  d: Magnetic Sensor DIAG\n\r"
 		 "  f: Magnetic Sensor READ\n\r"
 		 "  s: stepper one step forward \n\r"
+		 "  l: Test calibration NVM data storage \n\r"
 		 "  h: Display this menu again\n\r\r");
 }
 
@@ -471,6 +469,26 @@ void setAttiny24Motor(uint8_t pwmB, uint8_t pwmA, uint8_t gpio)
 	printf("ATTINY response 2: 0x%lx\n\r", response);
 }
 
+unsigned page_count = 0;
+float page[CALIBRATION_DATA_SIZE];
+int page_number = 0;
+nvram_data_t * page_ptr;
+
+static void store_lookup(float lookupAngle)
+{
+  page[page_count++] = lookupAngle;
+  if(page_count != CALIBRATION_DATA_SIZE)
+    return;
+
+  // we've filled an entire page, write it to the flash
+  flash_rw_calibration(page, page_ptr);
+
+  // reset our counters and increment our flash page
+  page_ptr = (nvram_data_t *)NVRAM_PAGE_ADDRESS(++page_number);
+  page_count = 0;
+  memset(page, 0, sizeof(page));
+}
+
 
 void readEncoder()
 {
@@ -627,6 +645,10 @@ int main(void)
 	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
 		MUX_PC01A_SPI_NPCS3);
 
+
+	//init pointer to the flash first page
+	page_ptr = (nvram_data_t *)NVRAM_PAGE_ADDRESS(++page_number);
+
 	/* Display menu. */
 	display_menu();
 
@@ -659,6 +681,13 @@ int main(void)
 			motor_test_gpio++;
 			if(motor_test_gpio == 0x10)
 				motor_test_gpio = 0;
+			break;
+		case 'l':
+			printf("Flash stats: start_addr: %x, flash_size: %d \n\r", FLASH_ADDR, FLASH_SIZE);
+			printf("Add test angle to NVM, value count: %d, page no: %d, page_addr: %x \n\r",page_count, page_number , page_ptr);
+			static float angleTest = 0.5;
+			angleTest += 1.0;
+			store_lookup(angleTest);
 			break;
 		case 'b':
 			setAttiny24Motor(0,0, 0);
