@@ -42,8 +42,8 @@
 #define USI_CS_PIN  PB3
 #define USI_PCINT PCINT11
 #else
-#define USI_CS_PIN  PB1
-#define USI_PCINT PCINT9
+#define USI_CS_PIN  PB0
+#define USI_PCINT PCINT8
 #endif
 
 
