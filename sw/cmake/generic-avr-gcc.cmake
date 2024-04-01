@@ -8,7 +8,7 @@
 # PROGRAM_EEPROM : enable eeprom programming (doesn't work on arduino)
 
 #generic avr flags
-set(AVR_CFLAGS "-ffunction-sections -fdata-sections -x c -funsigned-char -funsigned-bitfields -DDEBUG  -O1 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -g2 -Wall -c -std=gnu99")
+set(AVR_CFLAGS "-ffunction-sections -fdata-sections -x c -funsigned-char -funsigned-bitfields -DDEBUG  -O3 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -g2 -Wall -c -std=gnu99")
 set(AVR_LFLAGS "-Wl,--relax,--gc-sections")
 
 #find toolchain programs
