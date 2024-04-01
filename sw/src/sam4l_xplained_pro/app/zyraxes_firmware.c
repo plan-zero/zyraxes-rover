@@ -158,13 +158,13 @@ extern "C" {
 
 
 /* SPI clock setting (Hz). */
-static uint32_t gs_ul_spi_clock = 3000000;
+static uint32_t gs_ul_spi_clock = 3500000;
 
-uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last);
+static inline uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last);
 static void display_menu(void);
 static void spi_master_initialize(void);
 void readAttiny24Diagnostics(void);
-void setAttiny24Motor(uint8_t gpio);
+static inline void setAttiny24Motor(uint8_t gpio, int steps);
 void readEncoder(void);
 void readEncoderDiagnostics(void);
 void output(float theta, int effort);
@@ -325,7 +325,7 @@ static void spi_master_transfer(void *p_buf, uint32_t size)
 #define SPI_TIMEOUT_READ 100000 // timeout for SPI (TBD: exagerated, do some measurments and lower this)
 
 
-uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last)
+static inline uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last)
 {
 	uint32_t timeout = 0;
 	uint16_t out_data = 0;
@@ -367,14 +367,9 @@ void oneStep() {           /////////////////////////////////   oneStep    //////
   
 
   
-//1037
-
-  for(int i = 0 ; i < 12800; i++)
-  {
-	stepNumber += 1;
-	  setAttiny24Motor(0x00);
-  }
-  setAttiny24Motor(0x02);
+	for(int i = 0; i < 200; i++)
+		setAttiny24Motor(0x01, 64);
+  	setAttiny24Motor(0x02, 1);
 }
 
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
@@ -447,7 +442,7 @@ void output(float theta, int effort) {
   //setAttiny24Motor( (uint8_t)v_coil_A, (uint8_t)v_coil_B, gpio_data);
 }
 
-void setAttiny24Motor(uint8_t gpio)
+static inline void setAttiny24Motor(uint8_t gpio, int steps)
 {
 
 	uint32_t response = 0;
@@ -457,8 +452,11 @@ void setAttiny24Motor(uint8_t gpio)
 	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1, 1);
 	response |= (data << 8);
 	gpio &= 0x0F;
-	data = spi_8bit_sync_transfer(0x30 | gpio, SPI_CHIP_PCS_1, 1);
-	response |= data ;
+	for(int i = 0; i < steps; i++) {
+		data = spi_8bit_sync_transfer(0x30 | gpio, SPI_CHIP_PCS_1, 1);
+		response |= data ;
+	}
+	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1, 1);
 
 	//printf("ATTINY response 2: 0x%lx\n\r", response);
 }

@@ -75,7 +75,7 @@ int main()
 {
 	unsigned char slave_state = STATE_SLAVE_INIT;
 	unsigned char in_data = 0;
-	unsigned char do_step = 0;
+
 
 	spiX_initslave(SPIMODE);	// Init SPI driver as slave.
 	sei();		// Must do this to make driver work.
@@ -118,8 +118,15 @@ int main()
 				//get ready to recieve data, send ACK byte
 				step_data = in_data & 0x0F;
 				spiX_put(SLAVE_ACK);
-				slave_state = STATE_SLAVE_INIT;
-				do_step = 1;
+				slave_state = STATE_SLAVE_GET_CMD;
+				if(step_data & 0x01)
+					step(-1);
+				else
+					step(1);
+				
+				//stop motors
+				if(step_data & 0x02)
+					INPORT &= 0xF0;
 			}
 			else if(in_data == MASTER_DIAG)
 			{
@@ -141,18 +148,6 @@ int main()
 		if(STATE_SLAVE_INIT == slave_state)
 		{
 			in_data = 0;
-			if(do_step)
-			{
-				if(step_data & 0x01)
-					step(-1);
-				else
-					step(1);
-				
-				//stop motors
-				if(step_data & 0x02)
-					INPORT &= 0xF0;
-			}
-			do_step = 0;
 			step_data = 0;
 			spiX_put(SLAVE_SYNC);
 			slave_state = STATE_SLAVE_SEND_SYNC;
