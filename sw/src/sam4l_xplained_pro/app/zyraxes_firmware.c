@@ -158,19 +158,23 @@ extern "C" {
 
 
 /* SPI clock setting (Hz). */
-static uint32_t gs_ul_spi_clock = 3500000;
+static uint32_t gs_ul_spi_clock = 3000000;
+
+const float __attribute__((__aligned__(512))) lookup[16384] = {
+//Put lookup table here!
+};
 
 static inline uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last);
 static void display_menu(void);
 static void spi_master_initialize(void);
 void readAttiny24Diagnostics(void);
 static inline void setAttiny24Motor(uint8_t gpio, int steps);
-void readEncoder(void);
+int readEncoder(void);
 void readEncoderDiagnostics(void);
-void output(float theta, int effort);
 int mod(int xMod, int mMod);
 void oneStep(void);
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to);
+void calibrate();
 
 int mod(int xMod, int mMod) {
   return (xMod % mMod + mMod) % mMod;
@@ -195,6 +199,8 @@ static void display_menu(void)
 		 "  f: Magnetic Sensor READ\n\r"
 		 "  s: stepper one step forward \n\r"
 		 "  l: Test calibration NVM data storage \n\r"
+		 "  c: Calibrate routine \n\r"
+		 "  p: Print Calibration data \n\r"
 		 "  h: Display this menu again\n\r\r");
 }
 
@@ -362,14 +368,18 @@ void readAttiny24Diagnostics()
 }
 
 int stepNumber = 0;
+int dir = 0;
 
 void oneStep() {           /////////////////////////////////   oneStep    ///////////////////////////////
-  
-
-  
-	for(int i = 0; i < 200; i++)
-		setAttiny24Motor(0x01, 64);
-  	setAttiny24Motor(0x02, 1);
+	
+	if (!dir) {
+		stepNumber += 1;
+	}
+	else {
+		stepNumber -= 1;
+	}
+	for(int i = 0; i < 64; i++)
+		setAttiny24Motor(0x00, 1);
 }
 
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
@@ -381,65 +391,6 @@ static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
     return value >> (from-to);
   }
   return value << (to-from);
-}
-
-void output(float theta, int effort) {
-   int angle_1;
-   int angle_2;
-   int v_coil_A;
-   int v_coil_B;
-
-   int sin_coil_A;
-   int sin_coil_B;
-   int phase_multiplier = 10 * spr / 4;
-
-  //REG_PORT_OUTCLR0 = PORT_PA09; for debugging/timing
-
-  angle_1 = mod((phase_multiplier * theta) , 3600);   //
-  angle_2 = mod((phase_multiplier * theta)+900 , 3600);
-  
-  sin_coil_A  = sin_1[angle_1];
-
-  sin_coil_B = sin_1[angle_2];
-
-  v_coil_A = ((effort * sin_coil_A) / 1024);
-  v_coil_B = ((effort * sin_coil_B) / 1024);
-  printf("Angle A %d, B %d, Sin A %d, B %d, uMAX %d ,Vref1 %d,Vref2 %d \n\r",angle_1, angle_2, sin_coil_A, sin_coil_B, uMAX, v_coil_A, v_coil_B);
-
-  //analogFastWrite(VREF_1, abs(v_coil_A));
-  //analogFastWrite(VREF_2, abs(v_coil_B));
-  uint8_t gpio_data = 0;
-  if (v_coil_A >= 0)  {
-	gpio_data |= IN2;
-	gpio_data &= ~IN1;
-    //IN_2_HIGH();  //REG_PORT_OUTSET0 = PORT_PA21;     //write IN_2 HIGH
-    //IN_1_LOW();   //REG_PORT_OUTCLR0 = PORT_PA06;     //write IN_1 LOW
-  }
-  else  {
-	gpio_data &= ~IN2;
-	gpio_data |=IN1;
-    //IN_2_LOW();   //REG_PORT_OUTCLR0 = PORT_PA21;     //write IN_2 LOW
-    //IN_1_HIGH();  //REG_PORT_OUTSET0 = PORT_PA06;     //write IN_1 HIGH
-  }
-
-  if (v_coil_B >= 0)  {
-	gpio_data |= IN4;
-	gpio_data &= ~IN3;
-    //IN_4_HIGH();  //REG_PORT_OUTSET0 = PORT_PA20;     //write IN_4 HIGH
-    //IN_3_LOW();   //REG_PORT_OUTCLR0 = PORT_PA15;     //write IN_3 LOW
-  }
-  else  {
-	gpio_data &= ~IN4;
-	gpio_data |= IN3;
-    //IN_4_LOW();     //REG_PORT_OUTCLR0 = PORT_PA20;     //write IN_4 LOW
-    //IN_3_HIGH();    //REG_PORT_OUTSET0 = PORT_PA15;     //write IN_3 HIGH
-  }
-  v_coil_A = abs(v_coil_A);
-  v_coil_A = mapResolution(v_coil_A,8, 8);
-  v_coil_B = abs(v_coil_B);
-  v_coil_B = mapResolution(v_coil_B,8, 8);
-  //printf("uMAX %d ,Vref1 %d,Vref2 %d \n\r",uMAX, v_coil_A, v_coil_B);
-  //setAttiny24Motor( (uint8_t)v_coil_A, (uint8_t)v_coil_B, gpio_data);
 }
 
 static inline void setAttiny24Motor(uint8_t gpio, int steps)
@@ -464,7 +415,7 @@ static inline void setAttiny24Motor(uint8_t gpio, int steps)
 unsigned page_count = 0;
 float page[CALIBRATION_DATA_SIZE];
 int page_number = 0;
-nvram_data_t * page_ptr;
+static const void * page_ptr;
 
 static void store_lookup(float lookupAngle)
 {
@@ -473,16 +424,19 @@ static void store_lookup(float lookupAngle)
     return;
 
   // we've filled an entire page, write it to the flash
-  flash_rw_calibration(page, page_ptr);
+  printf("Add to NVM, page no: %d, page_addr: %x \n\r",page_number , page_ptr);
+  //flash_rw_calibration(page, page_ptr);
+  flashcalw_memcpy(page_ptr, page, FLASH_PAGE_SIZE, true);
 
   // reset our counters and increment our flash page
-  page_ptr = (nvram_data_t *)NVRAM_PAGE_ADDRESS(++page_number);
+  page_ptr += FLASH_PAGE_SIZE;//(nvram_data_t *)NVRAM_PAGE_ADDRESS(++page_number);
   page_count = 0;
   memset(page, 0, sizeof(page));
+  
 }
 
 
-void readEncoder()
+int readEncoder()
 {
   long angleTemp;
   uint8_t b1 = 0, b2 = 0;
@@ -492,7 +446,8 @@ void readEncoder()
 
   angleTemp = (((b1 << 8) | b2) & 0B0011111111111111);
 
-  printf("Magnetic RAW: %lu \n\r", angleTemp);
+  //printf("Magnetic RAW: %lu \n\r", angleTemp);
+  return angleTemp;
 }
 
 void readEncoderDiagnostics()
@@ -603,6 +558,197 @@ static void configure_console(void)
 	stdio_serial_init(CONF_UART, &uart_serial_options);
 }
 
+void calibrate() {   /// this is the calibration routine
+
+  static int cpr = 16384;
+  static float aps = 1.8;
+  int encoderReading = 0;     //or float?  not sure if we can average for more res?
+  int currentencoderReading = 0;
+  int lastencoderReading = 0;
+  int avg = 10;               //how many readings to average
+
+  int iStart = 0;     //encoder zero position index
+  int jStart = 0;
+  int stepNo = 0;
+  
+  int fullStepReadings[spr];
+    
+  int fullStep = 0;
+  int ticks = 0;
+  float lookupAngle = 0.0;
+  puts("Beginning calibration routine... \n\r");
+
+  encoderReading = readEncoder();
+  dir = 1;
+  oneStep();
+  delay_ms(500);
+
+  if ((readEncoder() - encoderReading) < 0)   //check which way motor moves when dir = true
+  {
+    puts("Wired backwards \n\r");    // rewiring either phase should fix this.  You may get a false message if you happen to be near the point where the encoder rolls over...
+    return;
+  }
+
+  while (stepNumber != 0) {       //go to step zero
+    if (stepNumber > 0) {
+      dir = 1;
+    }
+    else
+    {
+      dir = 0;
+    }
+    oneStep();
+    delay_ms(100);
+  }
+  dir = 1;
+  for (int x = 0; x < spr; x++) {     //step through all full step positions, recording their encoder readings
+
+    encoderReading = 0;
+    delay_ms(20);                         //moving too fast may not give accurate readings.  Motor needs time to settle after each step.
+    lastencoderReading = readEncoder();
+        
+    for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
+      currentencoderReading = readEncoder();
+
+      if ((currentencoderReading-lastencoderReading)<(-(cpr/2))){
+        currentencoderReading += cpr;
+      }
+      else if ((currentencoderReading-lastencoderReading)>((cpr/2))){
+        currentencoderReading -= cpr;
+      }
+ 
+      encoderReading += currentencoderReading;
+      delay_ms(10);
+      lastencoderReading = currentencoderReading;
+    }
+    encoderReading = encoderReading / avg;
+    if (encoderReading>cpr){
+      encoderReading-= cpr;
+    }
+    else if (encoderReading<0){
+      encoderReading+= cpr;
+    }
+
+    fullStepReadings[x] = encoderReading;
+   // SerialUSB.println(fullStepReadings[x], DEC);      //print readings as a sanity check
+    if (x % 20 == 0)
+    {
+      printf("\n\r DBG: %d \n\r", 100*x/spr);
+      
+    } else {
+      printf(".");
+    }
+    
+    oneStep();
+  	}
+      puts("\n\r");
+
+ 
+  for (int i = 0; i < spr; i++) {
+    ticks = fullStepReadings[mod((i + 1), spr)] - fullStepReadings[mod((i), spr)];
+    if (ticks < -15000) {
+      ticks += cpr;
+
+    }
+    else if (ticks > 15000) {
+      ticks -= cpr;
+    }
+   // SerialUSB.println(ticks);
+
+    if (ticks > 1) {                                    //note starting point with iStart,jStart
+      for (int j = 0; j < ticks; j++) {
+        stepNo = (mod(fullStepReadings[i] + j, cpr));
+        // SerialUSB.println(stepNo);
+        if (stepNo == 0) {
+          iStart = i;
+          jStart = j;
+        }
+
+      }
+    }
+
+    if (ticks < 1) {                                    //note starting point with iStart,jStart
+      for (int j = -ticks; j > 0; j--) {
+        stepNo = (mod(fullStepReadings[spr - 1 - i] + j, cpr));
+        // SerialUSB.println(stepNo);
+        if (stepNo == 0) {
+          iStart = i;
+          jStart = j;
+        }
+
+      }
+    }
+
+  }
+
+  // The code below generates the lookup table by intepolating between
+  // full steps and mapping each encoder count to a calibrated angle
+  // The lookup table is too big to store in volatile memory,
+  // so we must generate and store it into the flash on the fly
+
+  // begin the write to the calibration table
+  page_count = 0;
+  page_ptr = (const uint8_t*) lookup;
+  puts("Writing to flash 0x \n\r");
+  printf("%x ", page_ptr);
+
+  for (int i = iStart; i < (iStart + spr + 1); i++) {
+    ticks = fullStepReadings[mod((i + 1), spr)] - fullStepReadings[mod((i), spr)];
+
+    if (ticks < -15000) {           //check if current interval wraps over encoder's zero positon
+      ticks += cpr;
+    }
+    else if (ticks > 15000) {
+      ticks -= cpr;
+    }
+    //Here we print an interpolated angle corresponding to each encoder count (in order)
+    if (ticks > 1) {              //if encoder counts were increasing during cal routine...
+
+      if (i == iStart) { //this is an edge case
+        for (int j = jStart; j < ticks; j++) {
+	  store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+        }
+      }
+
+      else if (i == (iStart + spr)) { //this is an edge case
+        for (int j = 0; j < jStart; j++) {
+	  store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+        }
+      }
+      else {                        //this is the general case
+        for (int j = 0; j < ticks; j++) {
+	  store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+        }
+      }
+    }
+
+    else if (ticks < 1) {             //similar to above... for case when encoder counts were decreasing during cal routine
+      if (i == iStart) {
+        for (int j = - ticks; j > (jStart); j--) {
+          store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+        }
+      }
+      else if (i == iStart + spr) {
+        for (int j = jStart; j > 0; j--) {
+          store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+        }
+      }
+      else {
+        for (int j = - ticks; j > 0; j--) {
+          store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+        }
+      }
+
+    }
+
+
+  }
+
+  puts("Calibration complete! \n\r");
+  puts("The calibration table has been written to non-volatile Flash memory! \n\r");
+
+}
+
 
 /**
  * \brief Application entry point for SPI example.
@@ -639,7 +785,7 @@ int main(void)
 
 
 	//init pointer to the flash first page
-	page_ptr = (nvram_data_t *)NVRAM_PAGE_ADDRESS(++page_number);
+	page_ptr = (const uint8_t*) lookup;
 
 	/* Display menu. */
 	display_menu();
@@ -666,13 +812,9 @@ int main(void)
 			readAttiny24Diagnostics();
 			break;
 		case 't':
-			printf("Test motor: %d %d %d \n\r",motor_pwm_a, motor_pwm_b, motor_test_gpio);
-			//setAttiny24Motor(motor_pwm_a, motor_pwm_b, motor_test_gpio);
-			//motor_pwm_b = motor_pwm_a;
-			//motor_pwm_a ^= 0xFF;
-			motor_test_gpio++;
-			if(motor_test_gpio == 0x10)
-				motor_test_gpio = 0;
+			for(int i = 0; i < 200; i++)
+				setAttiny24Motor(0x00, 64);
+			setAttiny24Motor(0x03, 1);
 			break;
 		case 'l':
 			printf("Flash stats: start_addr: %x, flash_size: %d \n\r", FLASH_ADDR, FLASH_SIZE);
@@ -680,6 +822,22 @@ int main(void)
 			static float angleTest = 0.5;
 			angleTest += 1.0;
 			store_lookup(angleTest);
+			break;
+		case 'c':
+			calibrate();
+			
+
+			break;
+		case 'p':
+			puts("Print calibration data: \n\r");
+			for(int i = 0; i < 16384; i++)
+			{
+				char str[5];
+				snprintf(str, sizeof(str), "%f", lookup[i]);
+				printf("%s, ",str);
+				if( (i % 16 == 0) && (i != 0) )
+            		printf("\n\r");
+			}
 			break;
 		case 'b':
 			//setAttiny24Motor(0,0, 0);
