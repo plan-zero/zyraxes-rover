@@ -175,6 +175,7 @@ int mod(int xMod, int mMod);
 void oneStep(void);
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to);
 void calibrate();
+float read_angle();
 
 int mod(int xMod, int mMod) {
   return (xMod % mMod + mMod) % mMod;
@@ -429,7 +430,8 @@ static void store_lookup(float lookupAngle)
   flashcalw_memcpy(page_ptr, page, FLASH_PAGE_SIZE, true);
 
   // reset our counters and increment our flash page
-  page_ptr += FLASH_PAGE_SIZE;//(nvram_data_t *)NVRAM_PAGE_ADDRESS(++page_number);
+  page_number++;
+  page_ptr += FLASH_PAGE_SIZE;
   page_count = 0;
   memset(page, 0, sizeof(page));
   
@@ -556,6 +558,22 @@ static void configure_console(void)
 
 	/* Configure console UART. */
 	stdio_serial_init(CONF_UART, &uart_serial_options);
+}
+
+float read_angle()
+{
+  const int avg = 10;            //average a few readings
+  int encoderReading = 0;
+
+  //disableTCInterrupts();        //can't use readEncoder while in closed loop
+
+  for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
+    encoderReading += readEncoder();
+    delay_ms(10);
+    }
+
+  //return encoderReading * (360.0 / 16384.0) / avg;
+  return lookup[encoderReading / avg];
 }
 
 void calibrate() {   /// this is the calibration routine
@@ -832,7 +850,7 @@ int main(void)
 			puts("Print calibration data: \n\r");
 			for(int i = 0; i < 16384; i++)
 			{
-				char str[5];
+				char str[8];
 				snprintf(str, sizeof(str), "%f", lookup[i]);
 				printf("%s, ",str);
 				if( (i % 16 == 0) && (i != 0) )
@@ -843,7 +861,11 @@ int main(void)
 			//setAttiny24Motor(0,0, 0);
 			break;
 		case 'f':
-			readEncoder();
+			printf("Angle: ");
+			float angle = read_angle();
+			char str[8];
+			snprintf(str, sizeof(str), "%f", angle);
+			printf(" %s \n\r",str);
 			break;
 		case 's':
 			oneStep();
