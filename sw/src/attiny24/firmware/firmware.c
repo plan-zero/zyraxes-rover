@@ -4,6 +4,9 @@
 #include "sin_lut_microstep_64.h"
 #include <avr/interrupt.h>
 
+#define F_CPU 8000000UL
+#include <util/delay.h>
+
 
 #define SPIMODE 0	// Sample on leading _rising_ edge, setup on trailing _falling_ edge.
 //#define SPIMODE 1	// Sample on leading _falling_ edge, setup on trailing _rising_ edge.
@@ -125,8 +128,11 @@ int main()
 					step(1);
 				
 				//stop motors
-				if(step_data & 0x02)
+				if(step_data & 0x02) {
+					//make sure this is not affecting the speed
+					_delay_us(15);
 					INPORT &= 0xF0;
+				}
 			}
 			else if(in_data == MASTER_DIAG)
 			{

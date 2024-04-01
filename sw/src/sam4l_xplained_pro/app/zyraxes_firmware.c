@@ -160,7 +160,18 @@ extern "C" {
 /* SPI clock setting (Hz). */
 static uint32_t gs_ul_spi_clock = 3000000;
 
-const float __attribute__((__aligned__(512))) lookup[16384] = {
+#define DEFAULT_CPR 16384
+#define DEFAULT_CPR_THRESHOLD 15000
+//used to reduce the resolution of the magnetic data as calibration data is huge
+//anyway for our aplication it's enough to use only 11 bits, increase below number 
+//to reduce more bits
+#define MAGNETIC_REDUCE_RESOLUTION 1
+#define CPR (DEFAULT_CPR >> MAGNETIC_REDUCE_RESOLUTION)
+#define CPR_THRESHOLD (DEFAULT_CPR_THRESHOLD >> MAGNETIC_REDUCE_RESOLUTION)
+#define MAGNETIC_LUT_SIZE CPR
+
+
+const float __attribute__((__aligned__(512))) lookup[MAGNETIC_LUT_SIZE] = {
 //Put lookup table here!
 };
 
@@ -379,8 +390,7 @@ void oneStep() {           /////////////////////////////////   oneStep    //////
 	else {
 		stepNumber -= 1;
 	}
-	for(int i = 0; i < 64; i++)
-		setAttiny24Motor(0x00, 1);
+	setAttiny24Motor(0x00, 64);
 }
 
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
@@ -449,7 +459,8 @@ int readEncoder()
   angleTemp = (((b1 << 8) | b2) & 0B0011111111111111);
 
   //printf("Magnetic RAW: %lu \n\r", angleTemp);
-  return angleTemp;
+  //reduce rezolution
+  return angleTemp >> MAGNETIC_REDUCE_RESOLUTION;
 }
 
 void readEncoderDiagnostics()
@@ -578,7 +589,7 @@ float read_angle()
 
 void calibrate() {   /// this is the calibration routine
 
-  static int cpr = 16384;
+  static int cpr = CPR;
   static float aps = 1.8;
   int encoderReading = 0;     //or float?  not sure if we can average for more res?
   int currentencoderReading = 0;
@@ -664,11 +675,11 @@ void calibrate() {   /// this is the calibration routine
  
   for (int i = 0; i < spr; i++) {
     ticks = fullStepReadings[mod((i + 1), spr)] - fullStepReadings[mod((i), spr)];
-    if (ticks < -15000) {
+    if (ticks < -CPR_THRESHOLD) {
       ticks += cpr;
 
     }
-    else if (ticks > 15000) {
+    else if (ticks > CPR_THRESHOLD) {
       ticks -= cpr;
     }
    // SerialUSB.println(ticks);
@@ -713,10 +724,10 @@ void calibrate() {   /// this is the calibration routine
   for (int i = iStart; i < (iStart + spr + 1); i++) {
     ticks = fullStepReadings[mod((i + 1), spr)] - fullStepReadings[mod((i), spr)];
 
-    if (ticks < -15000) {           //check if current interval wraps over encoder's zero positon
+    if (ticks < -CPR_THRESHOLD) {           //check if current interval wraps over encoder's zero positon
       ticks += cpr;
     }
-    else if (ticks > 15000) {
+    else if (ticks > CPR_THRESHOLD) {
       ticks -= cpr;
     }
     //Here we print an interpolated angle corresponding to each encoder count (in order)
@@ -848,7 +859,7 @@ int main(void)
 			break;
 		case 'p':
 			puts("Print calibration data: \n\r");
-			for(int i = 0; i < 16384; i++)
+			for(int i = 0; i < MAGNETIC_LUT_SIZE; i++)
 			{
 				char str[8];
 				snprintf(str, sizeof(str), "%f", lookup[i]);
@@ -866,6 +877,8 @@ int main(void)
 			char str[8];
 			snprintf(str, sizeof(str), "%f", angle);
 			printf(" %s \n\r",str);
+			int raw = readEncoder();
+			printf("Raw: %d \n\r", raw);
 			break;
 		case 's':
 			oneStep();
