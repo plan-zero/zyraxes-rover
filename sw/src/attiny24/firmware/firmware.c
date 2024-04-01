@@ -1,6 +1,7 @@
 /* Test application for the SPI-via-USI-driver. */
 
 #include "spi_driver.h"
+#include "sin_lut_microstep_64.h"
 #include <avr/interrupt.h>
 
 
@@ -24,52 +25,69 @@
 
 #define IN1	PA0
 #define IN2 PA1
-#define IN3 PA3
-#define IN4 PA2
+#define IN3 PA2
+#define IN4 PA3
 
-const unsigned char gpio_port_lut[] = 
+#define INPORT PORTA
+
+#define EFFORT 37
+
+unsigned char step_data = 0;
+
+static inline void step(int8_t dir)
 {
-	0x0, //0 0 0 0
-	0x1, //0 0 0 1
-	0x2, //0 0 1 0
-	0x3, //0 0 1 1
-	0x8, //0 1 0 0
-	0x9, //0 1 0 1
-	0xA, //0 1 1 0
-	0xB, //0 1 1 1
-	0x4, //1 0 0 0
-	0x5, //1 0 0 1
-	0x6, //1 0 1 0
-	0x7, //1 0 1 1
-	0xC, //1 1 0 0
-	0xD, //1 1 0 1
-	0xE, //1 1 1 0
-	0xF, //1 1 1 1
-};
-unsigned char pwm_data[2] = {0};
-unsigned char gpio_data = 0;
+  int16_t v_coil_A = 0, v_coil_B = 0, angle_A = 0, angle_B = 0;
+  static uint16_t pos_a = 0, pos_b = POS_OFFSET;
+
+
+  angle_A = (int8_t)pgm_read_byte(&sin_lut[pos_a % SIN_LUT_LEN]);
+  pos_a += dir;
+  angle_B = (int8_t)pgm_read_byte(&sin_lut[pos_b % SIN_LUT_LEN]);
+  pos_b += dir;
+
+  v_coil_A = ( angle_A* EFFORT )/128;
+  v_coil_B = ( angle_B* EFFORT )/128;
+
+  OCR0B = abs(v_coil_A);
+  OCR0A = abs(v_coil_B);
+
+  INPORT &= 0xF0;
+  if (v_coil_A >= 0)  {
+    INPORT |= _BV(IN2);
+    INPORT &= ~_BV(IN1);
+  }
+  else {
+    INPORT &= ~_BV(IN2);
+    INPORT |= _BV(IN1);
+  }
+
+  if (v_coil_B >= 0) {
+    INPORT |= _BV(IN4);
+    INPORT &= ~_BV(IN3);
+  }
+  else {
+    INPORT &= ~_BV(IN4);
+    INPORT |= _BV(IN3);
+  }
+}
 
 int main()
 {
 	unsigned char slave_state = STATE_SLAVE_INIT;
 	unsigned char in_data = 0;
-	unsigned char byte_count = 0;
-	unsigned char update_regs = 0;
+	unsigned char do_step = 0;
 
 	spiX_initslave(SPIMODE);	// Init SPI driver as slave.
 	sei();		// Must do this to make driver work.
 
 	in_data = 0;
-	byte_count = 0;
-	pwm_data[0] = 0;
-	pwm_data[1] = 0;
-	gpio_data = 0;
+	step_data = 0;
 	spiX_put(SLAVE_SYNC);
 	slave_state = STATE_SLAVE_SEND_SYNC;
 
 	//configure PWM
     TCCR0A |= _BV(COM0B1) | _BV(COM0A1) | _BV(WGM01) | _BV(WGM00);
-    TCCR0B |= _BV(CS00) | _BV(CS01);
+    TCCR0B |= _BV(CS00);
 	DDRB |= _BV(PB2);
 	DDRA |= _BV(PA7);
     OCR0A = 0;
@@ -98,9 +116,10 @@ int main()
 			if( (in_data & 0xF0) == MASTER_DATA)
 			{
 				//get ready to recieve data, send ACK byte
-				gpio_data = in_data & 0x0F;
+				step_data = in_data & 0x0F;
 				spiX_put(SLAVE_ACK);
-				slave_state = STATE_SLAVE_GET_DATA;
+				slave_state = STATE_SLAVE_INIT;
+				do_step = 1;
 			}
 			else if(in_data == MASTER_DIAG)
 			{
@@ -112,16 +131,7 @@ int main()
 				slave_state = STATE_SLAVE_INIT;
 			}
 		break;
-		case STATE_SLAVE_GET_DATA:
-			if(byte_count >= 1)
-				slave_state = STATE_SLAVE_INIT;
-		    update_regs = 1;
-			pwm_data[byte_count] = in_data;
-			byte_count += 1;
-			spiX_put(SLAVE_SET);
 
-
-		break;
 
 		default:
 		break;
@@ -131,19 +141,19 @@ int main()
 		if(STATE_SLAVE_INIT == slave_state)
 		{
 			in_data = 0;
-			byte_count = 0;
-			if(update_regs)
+			if(do_step)
 			{
-				OCR0A = pwm_data[0];
-				OCR0B = pwm_data[1];
-
-				PORTA &= 0xF0;
-				PORTA |= gpio_port_lut[gpio_data];
+				if(step_data & 0x01)
+					step(-1);
+				else
+					step(1);
+				
+				//stop motors
+				if(step_data & 0x02)
+					INPORT &= 0xF0;
 			}
-			update_regs = 0;
-			pwm_data[0] = 0;
-			pwm_data[1] = 0;
-			gpio_data = 0;
+			do_step = 0;
+			step_data = 0;
 			spiX_put(SLAVE_SYNC);
 			slave_state = STATE_SLAVE_SEND_SYNC;
 		}

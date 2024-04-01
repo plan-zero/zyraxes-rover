@@ -158,13 +158,13 @@ extern "C" {
 
 
 /* SPI clock setting (Hz). */
-static uint32_t gs_ul_spi_clock = 2000000;
+static uint32_t gs_ul_spi_clock = 3000000;
 
 uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last);
 static void display_menu(void);
 static void spi_master_initialize(void);
 void readAttiny24Diagnostics(void);
-void setAttiny24Motor(uint8_t pwmA, uint8_t pwmB, uint8_t gpio);
+void setAttiny24Motor(uint8_t gpio);
 void readEncoder(void);
 void readEncoderDiagnostics(void);
 void output(float theta, int effort);
@@ -366,12 +366,15 @@ int stepNumber = 0;
 void oneStep() {           /////////////////////////////////   oneStep    ///////////////////////////////
   
 
-  stepNumber += 1;
+  
+//1037
 
-
-  //output(1.8 * stepNumber, 64); //updata 1.8 to aps..., second number is control effort
-  output(1.8 * stepNumber, (int)(0.33 * uMAX));
-  delay_ms(10);
+  for(int i = 0 ; i < 12800; i++)
+  {
+	stepNumber += 1;
+	  setAttiny24Motor(0x00);
+  }
+  setAttiny24Motor(0x02);
 }
 
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
@@ -406,7 +409,7 @@ void output(float theta, int effort) {
 
   v_coil_A = ((effort * sin_coil_A) / 1024);
   v_coil_B = ((effort * sin_coil_B) / 1024);
-  //printf("uMAX %d ,Vref1 %d,Vref2 %d \n\r",uMAX, v_coil_A, v_coil_B);
+  printf("Angle A %d, B %d, Sin A %d, B %d, uMAX %d ,Vref1 %d,Vref2 %d \n\r",angle_1, angle_2, sin_coil_A, sin_coil_B, uMAX, v_coil_A, v_coil_B);
 
   //analogFastWrite(VREF_1, abs(v_coil_A));
   //analogFastWrite(VREF_2, abs(v_coil_B));
@@ -440,11 +443,11 @@ void output(float theta, int effort) {
   v_coil_A = mapResolution(v_coil_A,8, 8);
   v_coil_B = abs(v_coil_B);
   v_coil_B = mapResolution(v_coil_B,8, 8);
-  printf("uMAX %d ,Vref1 %d,Vref2 %d \n\r",uMAX, v_coil_A, v_coil_B);
-  setAttiny24Motor( (uint8_t)v_coil_A, (uint8_t)v_coil_B, gpio_data);
+  //printf("uMAX %d ,Vref1 %d,Vref2 %d \n\r",uMAX, v_coil_A, v_coil_B);
+  //setAttiny24Motor( (uint8_t)v_coil_A, (uint8_t)v_coil_B, gpio_data);
 }
 
-void setAttiny24Motor(uint8_t pwmB, uint8_t pwmA, uint8_t gpio)
+void setAttiny24Motor(uint8_t gpio)
 {
 
 	uint32_t response = 0;
@@ -457,16 +460,7 @@ void setAttiny24Motor(uint8_t pwmB, uint8_t pwmA, uint8_t gpio)
 	data = spi_8bit_sync_transfer(0x30 | gpio, SPI_CHIP_PCS_1, 1);
 	response |= data ;
 
-	
-	printf("ATTINY response 1: 0x%lx\n\r", response);
-	response = 0;
-
-	data = spi_8bit_sync_transfer(pwmA, SPI_CHIP_PCS_1, 1);
-	response |= data << 8;
-	data = spi_8bit_sync_transfer(pwmB, SPI_CHIP_PCS_1, 1);
-	response |= data;
-
-	printf("ATTINY response 2: 0x%lx\n\r", response);
+	//printf("ATTINY response 2: 0x%lx\n\r", response);
 }
 
 unsigned page_count = 0;
@@ -653,7 +647,7 @@ int main(void)
 	display_menu();
 
 	uint8_t motor_test_gpio = 0;
-	uint8_t motor_pwm_a = 0;
+	uint8_t motor_pwm_a = 127;
 	uint8_t motor_pwm_b = 0;
 
 	while (1) {
@@ -675,9 +669,9 @@ int main(void)
 			break;
 		case 't':
 			printf("Test motor: %d %d %d \n\r",motor_pwm_a, motor_pwm_b, motor_test_gpio);
-			setAttiny24Motor(motor_pwm_a, motor_pwm_b, motor_test_gpio);
-			motor_pwm_b = motor_pwm_a;
-			motor_pwm_a ^= 0xFF;
+			//setAttiny24Motor(motor_pwm_a, motor_pwm_b, motor_test_gpio);
+			//motor_pwm_b = motor_pwm_a;
+			//motor_pwm_a ^= 0xFF;
 			motor_test_gpio++;
 			if(motor_test_gpio == 0x10)
 				motor_test_gpio = 0;
@@ -690,7 +684,7 @@ int main(void)
 			store_lookup(angleTest);
 			break;
 		case 'b':
-			setAttiny24Motor(0,0, 0);
+			//setAttiny24Motor(0,0, 0);
 			break;
 		case 'f':
 			readEncoder();

@@ -30,6 +30,7 @@ include_directories(${SPI_HEADER_INC})
 set(FIRMWARE_SRC
     ${CMAKE_SOURCE_DIR}/../drivers/spi/spi_driver.c
     ${CMAKE_SOURCE_DIR}/firmware.c
+    ${CMAKE_SOURCE_DIR}/sin_lut_microstep_64.c
 )
 avr_add_executable(firmware ${FIRMWARE_SRC})
 

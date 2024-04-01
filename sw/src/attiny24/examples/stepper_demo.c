@@ -91,7 +91,7 @@ int main(){
     OCR0B = 0;
 
 
-    for(uint32_t i=0; i < 12800 * 2; i++)
+    for(uint32_t i=0; i < 12800; i++)
     {
       output();
       _delay_us(10);
