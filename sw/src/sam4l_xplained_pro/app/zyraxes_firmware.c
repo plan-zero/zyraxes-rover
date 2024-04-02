@@ -100,6 +100,7 @@
 #include "constants.h"
 #include "nvm.h"
 #include "string.h"
+#include <tc.h>
 
 
 
@@ -165,7 +166,7 @@ static uint32_t gs_ul_spi_clock = 3000000;
 //used to reduce the resolution of the magnetic data as calibration data is huge
 //anyway for our aplication it's enough to use only 11 bits, increase below number 
 //to reduce more bits
-#define MAGNETIC_REDUCE_RESOLUTION 1
+#define MAGNETIC_REDUCE_RESOLUTION 2
 #define CPR (DEFAULT_CPR >> MAGNETIC_REDUCE_RESOLUTION)
 #define CPR_THRESHOLD (DEFAULT_CPR_THRESHOLD >> MAGNETIC_REDUCE_RESOLUTION)
 #define MAGNETIC_LUT_SIZE CPR
@@ -216,6 +217,49 @@ static void display_menu(void)
 		 "  h: Display this menu again\n\r\r");
 }
 
+void TC00_Handler(void)
+{
+	volatile uint32_t ul_dummy;
+
+	/* Clear status bit to acknowledge interrupt */
+	ul_dummy = tc_get_status(TC0, 0);
+
+	/* Avoid compiler warning */
+	UNUSED(ul_dummy);
+	static int count = 0;
+	count++;
+	if( (count % 8000) == 0)
+		printf("1 \n\r");
+}
+
+/**
+ *  Configure Timer Counter 0 to generate an interrupt every 200ms.
+ */
+static void configure_tc(void)
+{
+	uint32_t ul_div;
+	uint32_t ul_tcclks;
+	uint32_t ul_sysclk = sysclk_get_cpu_hz();
+	uint32_t handler_freq_hz = 6500;
+
+	/* Configure TC0 */
+	sysclk_enable_peripheral_clock(TC0);
+
+	/* Configure TC for a 5Hz frequency and trigger on RC compare. */
+	if (!tc_find_mck_divisor(handler_freq_hz, ul_sysclk, &ul_div, &ul_tcclks, ul_sysclk)) {
+		puts("No valid divisor found!\r");
+		return;
+	}
+	tc_init(TC0, 0, ul_tcclks | TC_CMR_CPCTRG);
+	tc_write_rc(TC0, 0, (ul_sysclk / ul_div) / handler_freq_hz);
+
+	/* Configure and enable interrupt on RC compare */
+	NVIC_EnableIRQ((IRQn_Type) TC00_IRQn);
+	tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
+
+	/* Start the counter. */
+	tc_start(TC0, 0);
+}
 
 /**
  * \brief Initialize SPI as master.
@@ -818,6 +862,8 @@ int main(void)
 
 	/* Display menu. */
 	display_menu();
+
+	configure_tc();
 
 	uint8_t motor_test_gpio = 0;
 	uint8_t motor_pwm_a = 127;
