@@ -35,7 +35,7 @@
 
 #define EFFORT 37
 
-unsigned char step_data = 0;
+
 
 static inline void step(int8_t dir)
 {
@@ -74,17 +74,27 @@ static inline void step(int8_t dir)
   }
 }
 
+union steps_data{
+	uint32_t do_steps;
+	uint8_t data[4]; 
+};
+
 int main()
 {
 	unsigned char slave_state = STATE_SLAVE_INIT;
-	unsigned char in_data = 0;
+	unsigned char in_data;
+	unsigned char byte_count;
+	unsigned char step_config = 0;
+	union steps_data motor_steps;
 
+	motor_steps.do_steps = 0;
 
 	spiX_initslave(SPIMODE);	// Init SPI driver as slave.
 	sei();		// Must do this to make driver work.
 
+	byte_count = 0;
 	in_data = 0;
-	step_data = 0;
+	step_config = 0;
 	spiX_put(SLAVE_SYNC);
 	slave_state = STATE_SLAVE_SEND_SYNC;
 
@@ -119,20 +129,10 @@ int main()
 			if( (in_data & 0xF0) == MASTER_DATA)
 			{
 				//get ready to recieve data, send ACK byte
-				step_data = in_data & 0x0F;
+				step_config = in_data & 0x0F;
 				spiX_put(SLAVE_ACK);
-				slave_state = STATE_SLAVE_GET_CMD;
-				if(step_data & 0x01)
-					step(-1);
-				else
-					step(1);
-				
-				//stop motors
-				if(step_data & 0x02) {
-					//make sure this is not affecting the speed
-					_delay_us(15);
-					INPORT &= 0xF0;
-				}
+				slave_state = STATE_SLAVE_GET_DATA;
+
 			}
 			else if(in_data == MASTER_DIAG)
 			{
@@ -144,7 +144,16 @@ int main()
 				slave_state = STATE_SLAVE_INIT;
 			}
 		break;
+		case STATE_SLAVE_GET_DATA:
+			if(byte_count >= 3)
+				slave_state = STATE_SLAVE_INIT;
+	
+			motor_steps.data[byte_count] = in_data;
+			byte_count += 1;
+			spiX_put(SLAVE_SET);
 
+
+		break;
 
 		default:
 		break;
@@ -153,10 +162,24 @@ int main()
 		//re-init slave in case of any errors
 		if(STATE_SLAVE_INIT == slave_state)
 		{
+			for(uint32_t i = 0; i < motor_steps.do_steps; i++)
+			{
+				if(step_config)
+					step(-1);
+				else
+					step(1);
+				_delay_us(10);
+			}
+			if(step_config & 0x2) //stop motor
+				INPORT &= 0xF0;
+			//reset vars
 			in_data = 0;
-			step_data = 0;
+			step_config = 0;
 			spiX_put(SLAVE_SYNC);
 			slave_state = STATE_SLAVE_SEND_SYNC;
+			motor_steps.do_steps = 0;
+			byte_count = 0;
+			step_config = 0;
 		}
 
 		while(!spiX_start_transfer())//wait transfer and do idle stuff
