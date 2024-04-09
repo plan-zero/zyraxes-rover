@@ -35,14 +35,31 @@
 
 #define EFFORT 37
 
+// NEMA17 no gearbox
+//measured 12.625 us 
+//if this is 64 microstep it requires at least 22.635 us to have time to update ONE step
+//ideally this should be 25us, hence ~1.5 ms for a full step (1489us measured,  64 microsteps)
+// measured step: 1.5 ms
+// full rotation: 320 ms
+// Vin = 13.6
+// rpm: 187.5
+// measured speed with NO gearbox and wheel diameter 120: 1.175 m/s
+
+// NEMA17 with gearbox 5 2/11
+//measure step: 1.81 ms 
+// full rotation: 384 ms
+// full rotation with 5.18 ratio: 1980ms (1,98s)
+//Vin = 13.6
+// rpm: 30.3
+// measured speed with gearbox and wheel diameter 120: 0.18 m/s
 
 static inline void output()
 {
-  int16_t v_coil_A = 0, v_coil_B = 0, angle_A = 0, angle_B = 0;
-  static uint16_t pos_a = 0, pos_b = POS_OFFSET;
+  int8_t v_coil_A = 0, v_coil_B = 0, angle_A = 0, angle_B = 0;
+  static uint8_t pos_a = 0, pos_b = POS_OFFSET;
 
 
-  angle_A = (int8_t)pgm_read_byte(&sin_lut[pos_a % SIN_LUT_LEN]);
+  angle_A = (int8_t)pgm_read_byte(&sin_lut[pos_a % SIN_LUT_LEN]); //(int8_t)sin_lut[pos_a % SIN_LUT_LEN];
   pos_a++;
   angle_B = (int8_t)pgm_read_byte(&sin_lut[pos_b % SIN_LUT_LEN]);
   pos_b++;
@@ -53,7 +70,7 @@ static inline void output()
   OCR0B = abs(v_coil_A);
   OCR0A = abs(v_coil_B);
 
-  INPORT &= 0xF0;
+  //INPORT &= 0xF0;
   if (v_coil_A >= 0)  {
     INPORT |= _BV(IN2);
     INPORT &= ~_BV(IN1);
@@ -81,6 +98,9 @@ int main(){
     DDRA |= _BV(IN3);
     DDRA |= _BV(IN4);
 
+    DDRB |= 1 << PB1;
+    PORTB |= 1 << PB1;
+
 
 	//configure PWM
     TCCR0A |= _BV(COM0B1) | _BV(COM0A1) | _BV(WGM01) | _BV(WGM00);
@@ -90,15 +110,15 @@ int main(){
     OCR0A = 0;
     OCR0B = 0;
 
-
-    for(uint32_t i=0; i < 12800; i++)
+    PORTB &= ~(1 << PB1);
+    for(uint32_t i=0; i < 12800 ; i++)
     {
       output();
-      _delay_us(10);
+      _delay_us(15);
     }
-
+    PORTB |= 1 << PB1;
     //stop motors
-    INPORT &= 0xF0;
+    //INPORT &= 0xF0;
 
     while(1)
     {

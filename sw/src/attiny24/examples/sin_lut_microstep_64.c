@@ -2,7 +2,7 @@
 //params: spr: 200 theta: 1.8 microstep: 64
 #include "stdint.h"
 #include "sin_lut_microstep_64.h"
-const uint16_t sin_lut[SIN_LUT_LEN] PROGMEM = {
+const int8_t sin_lut[SIN_LUT_LEN] PROGMEM = {
 0,3,6,9,12,15,19,22,25,28
 ,31,34,37,40,43,46,49,51,54,57
 ,60,63,65,68,70,73,76,78,80,83

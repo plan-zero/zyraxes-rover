@@ -6,7 +6,7 @@
 #define SIN_MAX_VALUE 127
 #define SIN_LUT_LEN 256
 
-extern const uint16_t sin_lut[SIN_LUT_LEN] PROGMEM;
+extern const int8_t sin_lut[SIN_LUT_LEN] PROGMEM;
 
 #endif
 
