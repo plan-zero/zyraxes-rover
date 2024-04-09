@@ -5,6 +5,7 @@
 #define POS_OFFSET 64
 #define SIN_MAX_VALUE 127
 #define SIN_LUT_LEN 256
+#define FULL_SPEED_DELAY 10
 
 extern const int8_t sin_lut[SIN_LUT_LEN] PROGMEM;
 

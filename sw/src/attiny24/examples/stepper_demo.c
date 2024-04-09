@@ -24,7 +24,7 @@
 #include <math.h>
 
 
-#include "sin_lut_microstep_64.h"
+#include "sin_lut_microstep_32.h"
 
 #define IN1 PA0
 #define IN2 PA1
@@ -59,7 +59,7 @@ static inline void output()
   static uint8_t pos_a = 0, pos_b = POS_OFFSET;
 
 
-  angle_A = (int8_t)pgm_read_byte(&sin_lut[pos_a % SIN_LUT_LEN]); //(int8_t)sin_lut[pos_a % SIN_LUT_LEN];
+  angle_A = (int8_t)pgm_read_byte(&sin_lut[pos_a % SIN_LUT_LEN]); //(int8_t)sin_lut[pos_b % SIN_LUT_LEN];
   pos_a++;
   angle_B = (int8_t)pgm_read_byte(&sin_lut[pos_b % SIN_LUT_LEN]);
   pos_b++;
@@ -98,8 +98,8 @@ int main(){
     DDRA |= _BV(IN3);
     DDRA |= _BV(IN4);
 
-    DDRB |= 1 << PB1;
-    PORTB |= 1 << PB1;
+    DDRB |= 1 << PB0;
+    PORTB |= 1 << PB0;
 
 
 	//configure PWM
@@ -110,13 +110,15 @@ int main(){
     OCR0A = 0;
     OCR0B = 0;
 
-    PORTB &= ~(1 << PB1);
-    for(uint32_t i=0; i < 12800 ; i++)
+    PORTB &= ~(1 << PB0);
+
+    for(uint32_t i=0; i < 6400 * 2; i++)
     {
       output();
-      _delay_us(15);
+      _delay_us(55);
     }
-    PORTB |= 1 << PB1;
+
+    PORTB |= 1 << PB0;
     //stop motors
     //INPORT &= 0xF0;
 

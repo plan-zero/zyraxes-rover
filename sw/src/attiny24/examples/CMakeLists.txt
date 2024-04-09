@@ -38,7 +38,7 @@ avr_add_executable(spi_demo ${SPI_DEMO_SOURCE_FILES})
 
 set(MOTOR_DEMO_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/stepper_demo.c
-    ${CMAKE_SOURCE_DIR}/sin_lut_microstep_64.c
+    ${CMAKE_SOURCE_DIR}/sin_lut_microstep_32.c
 )
 avr_add_executable(stepper_demo ${MOTOR_DEMO_SOURCE_FILES})
 
