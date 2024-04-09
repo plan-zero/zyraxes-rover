@@ -195,6 +195,9 @@ void calibrate(uint8_t PCs);
 float read_angle();
 void pid_init_data();
 
+#define MAX_SPEED 100
+int motor_speed = MAX_SPEED;
+
 int mod(int xMod, int mMod) {
   return (xMod % mMod + mMod) % mMod;
 }
@@ -221,8 +224,10 @@ static void display_menu(void)
 		 "  l: Test calibration NVM data storage \n\r"
 		 "  c: Calibrate routine \n\r"
 		 "  p: Print Calibration data \n\r"
-		 "  w: Toggle close loop control \n\r"
+		 "  1: increase motor speed \n\r\r"
+		 "  2: decrease motor speed \n\r\r"
 		 "  h: Display this menu again\n\r\r");
+
 }
 
 
@@ -432,8 +437,8 @@ void readAttiny24Diagnostics(uint8_t PCs)
 int dir = 0;
 
 void oneStep(uint8_t PCs) {           /////////////////////////////////   oneStep    ///////////////////////////////
-	
-		setAttiny24Motor(0x80, PCs);
+		for(int i =0; i < 16; i++)
+			setAttiny24Motor(0x80, PCs);
 }
 
 
@@ -875,13 +880,13 @@ int main(void)
 		case 't':
 			for(int i = 0; i < 3200; i++){
 				setAttiny24Motor(0x80, SPI_CHIP_PCS_1);
-				delay_us(100);
+				delay_us(motor_speed);
 			}
 			break;
 		case 'y':
 			for(int i = 0; i < 16576; i++) {
 				setAttiny24Motor(0x80, SPI_CHIP_PCS_5);
-				delay_us(100);
+				delay_us(motor_speed);
 			}
 			break;
 		case 'l':
@@ -922,19 +927,14 @@ int main(void)
 		case 's':
 			oneStep(SPI_CHIP_PCS_1);
 			break;
-		case 'w':
-			enable_close_loop ^= 1;
-			if(enable_close_loop)
-			{
-				
-				printf("Enabling close loop control! \n\r");
-				tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
-			}
-			else
-			{
-				printf("Disabling close loop control! \n\r");
-				tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
-			}
+		case '1':
+			puts("Increase speed with 10p! \n\r");
+			if(motor_speed > MAX_SPEED)
+				motor_speed -= 10;
+			break;
+		case '2':
+			puts("Decrease speed with 10p! \n\r");
+			motor_speed += 10;
 			break;
 		default:
 			break;
