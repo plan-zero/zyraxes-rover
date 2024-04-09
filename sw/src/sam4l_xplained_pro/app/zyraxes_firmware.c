@@ -101,7 +101,7 @@
 #include "nvm.h"
 #include "string.h"
 #include <tc.h>
-
+#include "math.h"
 
 
 
@@ -130,8 +130,14 @@ extern "C" {
 #define IN3 4
 #define IN4 8
 
-#define SPI_CHIP_PCS_1 0x0D//spi_get_pcs(SPI_CHIP_SEL_1)
-#define SPI_CHIP_PCS_0 0x0E//spi_get_pcs(SPI_CHIP_SEL_0)
+#define SPI_CHIP_PCS_5 0x4
+#define SPI_CHIP_PCS_4 0x5
+
+#define SPI_CHIP_PCS_3 0x2
+#define SPI_CHIP_PCS_2 0x3
+
+#define SPI_CHIP_PCS_1 0x0//0x0D//spi_get_pcs(SPI_CHIP_SEL_1)
+#define SPI_CHIP_PCS_0  0x01//0x0E//spi_get_pcs(SPI_CHIP_SEL_0)
 
 /* Clock polarity. */
 #define SPI_CLK_POLARITY 0
@@ -143,7 +149,7 @@ extern "C" {
 #define SPI_DLYBS 200
 
 /* Delay between consecutive transfers. */
-#define SPI_DLYBCT 0x40
+#define SPI_DLYBCT 64
 
 #define CHIPSELECT_HIGH() ioport_set_pin_level(PIN_PB12, IOPORT_PIN_LEVEL_HIGH)
 #define CHIPSELECT_LOW()  ioport_set_pin_level(PIN_PB12, IOPORT_PIN_LEVEL_LOW)
@@ -179,15 +185,16 @@ const float __attribute__((__aligned__(512))) lookup[MAGNETIC_LUT_SIZE] = {
 static inline uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last);
 static void display_menu(void);
 static void spi_master_initialize(void);
-void readAttiny24Diagnostics(void);
-static inline void setAttiny24Motor(uint8_t gpio, int steps);
+void readAttiny24Diagnostics(uint8_t PCs);
+static inline void setAttiny24Motor(uint8_t steps_config, uint32_t steps, uint8_t sync, uint8_t PCs);
 int readEncoder(void);
 void readEncoderDiagnostics(void);
 int mod(int xMod, int mMod);
-void oneStep(void);
+void oneStep(uint8_t PCs);
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to);
-void calibrate();
+void calibrate(uint8_t PCs);
 float read_angle();
+void pid_init_data();
 
 int mod(int xMod, int mMod) {
   return (xMod % mMod + mMod) % mMod;
@@ -207,29 +214,221 @@ static void display_menu(void)
 	puts("  m: Re-initialize SPI Master\n\r"
 		 "  a: Attiny24 DIAG\n\r"
 		 "  b: Attiny24 Motor STOP\n\r"
-		 "  t: Attiny Motor test \n\r"
+		 "  t: Attiny Motor1 test \n\r"
+		 "  t: Attiny Motor2 test \n\r"
 		 "  d: Magnetic Sensor DIAG\n\r"
 		 "  f: Magnetic Sensor READ\n\r"
 		 "  s: stepper one step forward \n\r"
 		 "  l: Test calibration NVM data storage \n\r"
 		 "  c: Calibrate routine \n\r"
 		 "  p: Print Calibration data \n\r"
+		 "  w: Toggle close loop control \n\r"
 		 "  h: Display this menu again\n\r\r");
 }
+
+//interrupt vars
+
+volatile int U = 0;       //control effort (abs)
+volatile float r = 0.0;   //setpoint
+volatile float y = 0.0;   // measured angle
+volatile float v = 0.0;  // estimated velocity  (velocity loop)
+volatile float yw = 0.0;  // "wrapped" angle (not limited to 0-360)
+volatile float yw_1 = 0.0;
+volatile float e = 0.0;   // e = r-y (error)
+volatile float p = 0.0;   // proportional effort
+volatile float i = 0.0;   // integral effort
+
+
+volatile float u = 0.0;     //real control effort (not abs)
+volatile float u_1 = 0.0;   //value of u at previous time step, etc...
+volatile float e_1 = 0.0;   //these past values can be useful for more complex controllers/filters     
+volatile float u_2 = 0.0;
+volatile float e_2 = 0.0;
+volatile float u_3 = 0.0;
+volatile float e_3 = 0.0;
+volatile long counter = 0;
+
+volatile long wrap_count = 0;  //keeps track of how many revolutions the motor has gone though (so you can command angles outside of 0-360)
+volatile float y_1 = 0;
+
+  
+volatile long step_count = 0;  //For step/dir interrupt (closed loop)
+int stepNumber = 0; // open loop step number (used by 's' and for cal routine)
+
+volatile float ITerm;
+volatile float DTerm;
+
+//----Current Parameters-----
+
+volatile float Fs = 1000.0;   //Sample frequency in Hz
+
+volatile float pKp = 15.0;      //position mode PID values.  Depending on your motor/load/desired performance, you will need to tune these values.  You can also implement your own control scheme
+volatile float pKi = 0.2;
+volatile float pKd = 250.0;//1000.0;
+volatile float pLPF = 30;       //break frequency in hertz
+
+volatile float vKp = 0.001;       //velocity mode PID values.  Depending on your motor/load/desired performance, you will need to tune these values.  You can also implement your own control scheme
+volatile float vKi = 0.001;
+volatile float vKd = 0.0;
+volatile float vLPF = 100.0;       //break frequency in hertz
+
+volatile float pLPFa;
+volatile float pLPFb;
+volatile float vLPFa;
+volatile float vLPFb;
+
+volatile float PA;
+volatile int angle_to_steps = 0;
+volatile int steps_dir = 0;
+volatile int missed_steps = 0;
+
+char mode = 'x';
+
+void pid_init_data() {
+	pLPFa = exp(pLPF*-2*3.14159/Fs); // z = e^st pole mapping
+	pLPFb = (1.0-pLPFa);
+	vLPFa = exp(vLPF*-2*3.14159/Fs); // z = e^st pole mapping
+	vLPFb = (1.0-vLPFa)* Fs * 0.16666667;
+	PA = 1.8;
+}
+
 
 void TC00_Handler(void)
 {
 	volatile uint32_t ul_dummy;
+
+
+
+
+
+  static int print_counter = 0;               //this is used by step response
+
+     
+
+    y = lookup[readEncoder()];                    //read encoder and lookup corrected angle in calibration lookup table
+   
+    if ((y - y_1) < -180.0) wrap_count += 1;      //Check if we've rotated more than a full revolution (have we "wrapped" around from 359 degrees to 0 or ffrom 0 to 359?)
+    else if ((y - y_1) > 180.0) wrap_count -= 1;
+
+    yw = (y + (360.0 * wrap_count));              //yw is the wrapped angle (can exceed one revolution)
+
+	if (yw < r - 1.8) {
+		missed_steps -= 1;
+	}
+	else if (yw > r + 1.8) {
+		missed_steps += 1;
+	}
+    
+	//output(0.1125 * (-(r - missed_steps)), (255 / 3.3) * (iLevel * 10 * rSense));
+	angle_to_steps = (int)(r/0.028125) - (missed_steps * 64);
+	if(angle_to_steps < 0)
+		steps_dir = 1;
+	else 
+		steps_dir = 0;
+	angle_to_steps = abs(angle_to_steps);
+	setAttiny24Motor(steps_dir, angle_to_steps, 0, SPI_CHIP_PCS_1);
+
+	/*
+	//switch (mode) {
+	//case 'x':         // position control                        
+		e = (r - yw);
+		
+		ITerm += (pKi * e);                             //Integral wind up limit
+		if (ITerm > 150.0) ITerm = 150.0;
+		else if (ITerm < -150.0) ITerm = -150.0;          
+		
+		DTerm = pLPFa*DTerm -  pLPFb*pKd*(yw-yw_1);
+		
+		u = (pKp * e) + ITerm + DTerm;
+		
+		
+	//	break;
+	
+	case 'v':         // velocity controlr
+		v = vLPFa*v +  vLPFb*(yw-yw_1);     //filtered velocity called "DTerm" because it is similar to derivative action in position loop
+
+		e = (r - v);   //error in degrees per rpm (sample frequency in Hz * (60 seconds/min) / (360 degrees/rev) )
+
+		ITerm += (vKi * e);                 //Integral wind up limit
+		if (ITerm > 200) ITerm = 200;
+		else if (ITerm < -200) ITerm = -200;
+	
+		u = ((vKp * e) + ITerm - (vKd * (e-e_1)));
+		
+		//SerialUSB.println(e);
+		break;
+		
+	case 't':         // torque control
+		u = 1.0 * r ;
+		break;
+	default:
+		u = 0;
+		break;
+	}
+
+	y_1 = y;  //copy current value of y to previous value (y_1) for next control cycle before PA angle added
+
+
+	if (u > 0)          //Depending on direction we want to apply torque, add or subtract a phase angle of PA for max effective torque.  PA should be equal to one full step angle: if the excitation angle is the same as the current position, we would not move!  
+	{                 //You can experiment with "Phase Advance" by increasing PA when operating at high speeds
+		y += PA;          //update phase excitation angle
+		if (u > uMAX)     // limit control effort
+			u = uMAX;       //saturation limits max current command
+	}
+	else
+	{
+		y -= PA;          //update phase excitation angle
+		if (u < -uMAX)    // limit control effort
+			u = -uMAX;      //saturation limits max current command
+	}
+
+	U = abs(u);       //
+	*/
+
+	//output(-y, round(U));    // update phase currents
+	//output(-y);
+	//convert y to steps knowing the driver is using 64 microsteps
+	//angle_to_steps = (int)( y / 0.028125);
+	//if(angle_to_steps < 0)
+	//	steps_dir = 0;
+	//else
+	//	steps_dir = 1;
+	//angle_to_steps = abs(angle_to_steps);
+	//setAttiny24Motor(steps_dir, angle_to_steps, 0);
+	
+
+	//static int count = 0;
+	//count++;
+	//if( (count % 6500) == 0){
+	//	printf("steps = %d, dir = %d, missed steps: %d\n\r", angle_to_steps, steps_dir, missed_steps);
+	//	char str[8];
+	//	snprintf(str, sizeof(str), "%f", y);
+	//	printf("Y= %s \n\r",str);
+	//	snprintf(str, sizeof(str), "%f", y_1);
+	//	printf("Y_1= %s \n\r",str);
+	//	snprintf(str, sizeof(str), "%f", yw_1);
+	//	printf("Yw_1= %s \n\r",str);
+	//}
+    
+    
+	// e_3 = e_2;    //copy current values to previous values for next control cycle
+	e_2 = e_1;    //these past values can be useful for more complex controllers/filters.  Uncomment as necessary    
+	e_1 = e;
+	// u_3 = u_2;
+	u_2 = u_1;
+	u_1 = u;
+	yw_1 = yw;
+	y_1 = y;
+
 
 	/* Clear status bit to acknowledge interrupt */
 	ul_dummy = tc_get_status(TC0, 0);
 
 	/* Avoid compiler warning */
 	UNUSED(ul_dummy);
-	static int count = 0;
-	count++;
-	if( (count % 8000) == 0)
-		printf("1 \n\r");
+
+    
+
 }
 
 /**
@@ -240,7 +439,7 @@ static void configure_tc(void)
 	uint32_t ul_div;
 	uint32_t ul_tcclks;
 	uint32_t ul_sysclk = sysclk_get_cpu_hz();
-	uint32_t handler_freq_hz = 6500;
+	uint32_t handler_freq_hz = 50;
 
 	/* Configure TC0 */
 	sysclk_enable_peripheral_clock(TC0);
@@ -255,7 +454,7 @@ static void configure_tc(void)
 
 	/* Configure and enable interrupt on RC compare */
 	NVIC_EnableIRQ((IRQn_Type) TC00_IRQn);
-	tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
+	//tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
 
 	/* Start the counter. */
 	tc_start(TC0, 0);
@@ -408,25 +607,22 @@ static inline uint8_t spi_8bit_sync_transfer(uint8_t in_data, uint8_t cs, uint8_
 	return out_data;
 }
 
-void readAttiny24Diagnostics()
+void readAttiny24Diagnostics(uint8_t PCs)
 {
 
 	uint32_t response = 0;
 	uint8_t data = 0;
 
 	//sync with attiny24
-	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1, 1);
-	response |= data;
-	data = spi_8bit_sync_transfer(0x20, SPI_CHIP_PCS_1, 1);
-	response |= (data << 8);
+	data = spi_8bit_sync_transfer(0x10, PCs, 1);
+	response = data;
 
 	printf("ATTINY response: 0x%lx\n\r", response);
 }
 
-int stepNumber = 0;
 int dir = 0;
 
-void oneStep() {           /////////////////////////////////   oneStep    ///////////////////////////////
+void oneStep(uint8_t PCs) {           /////////////////////////////////   oneStep    ///////////////////////////////
 	
 	if (!dir) {
 		stepNumber += 1;
@@ -434,7 +630,7 @@ void oneStep() {           /////////////////////////////////   oneStep    //////
 	else {
 		stepNumber -= 1;
 	}
-	setAttiny24Motor(0x00, 64);
+	setAttiny24Motor(0x01, 64, 0, PCs);
 }
 
 static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
@@ -448,23 +644,44 @@ static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
   return value << (to-from);
 }
 
-static inline void setAttiny24Motor(uint8_t gpio, int steps)
+static inline void setAttiny24Motor(uint8_t steps_config, uint32_t steps, uint8_t sync, uint8_t PCs)
 {
 
 	uint32_t response = 0;
 	uint8_t data = 0;
+	uint8_t * u8 = (uint8_t *)&steps;
 
 	//sync with attiny24
-	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1, 1);
-	response |= (data << 8);
-	gpio &= 0x0F;
-	for(int i = 0; i < steps; i++) {
-		data = spi_8bit_sync_transfer(0x30 | gpio, SPI_CHIP_PCS_1, 1);
-		response |= data ;
-	}
-	data = spi_8bit_sync_transfer(0x10, SPI_CHIP_PCS_1, 1);
+	data = spi_8bit_sync_transfer(0x10, PCs, 1);
+	response |= data;
 
-	//printf("ATTINY response 2: 0x%lx\n\r", response);
+	if(sync)
+	{
+		while(response != 0xaa00)
+		{
+			delay_us(600);
+			response = 0;
+			data = spi_8bit_sync_transfer(0x10, PCs, 1);
+			response |= data;
+		}
+	}
+
+	
+	
+	steps_config &= 0x0F;
+	data = spi_8bit_sync_transfer(0x30 | steps_config , PCs, 1);
+	response |= (data << 8);
+
+	
+	printf("Response: 0x%lx\n\r", response);
+
+	uint32_t u32res = 0;
+	for(int i = 0; i < 4; i++) {
+		data = spi_8bit_sync_transfer(*(u8+i), PCs, 1);
+		u32res = data << (8*i);
+	}
+
+	printf("ATTINY response 2: 0x%lx\n\r", u32res);
 }
 
 unsigned page_count = 0;
@@ -631,7 +848,7 @@ float read_angle()
   return lookup[encoderReading / avg];
 }
 
-void calibrate() {   /// this is the calibration routine
+void calibrate(uint8_t PCs) {   /// this is the calibration routine
 
   static int cpr = CPR;
   static float aps = 1.8;
@@ -653,7 +870,7 @@ void calibrate() {   /// this is the calibration routine
 
   encoderReading = readEncoder();
   dir = 1;
-  oneStep();
+  oneStep(PCs);
   delay_ms(500);
 
   if ((readEncoder() - encoderReading) < 0)   //check which way motor moves when dir = true
@@ -670,7 +887,7 @@ void calibrate() {   /// this is the calibration routine
     {
       dir = 0;
     }
-    oneStep();
+    oneStep(PCs);
     delay_ms(100);
   }
   dir = 1;
@@ -712,7 +929,7 @@ void calibrate() {   /// this is the calibration routine
       printf(".");
     }
     
-    oneStep();
+    oneStep(PCs);
   	}
       puts("\n\r");
 
@@ -850,8 +1067,8 @@ int main(void)
 	ioport_set_pin_dir(LED_0_PIN, IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(LED_0_PIN, IOPORT_PIN_LEVEL_HIGH);
 	//INIT CS for Encoder
-	ioport_set_pin_dir(PIN_PB12,IOPORT_DIR_OUTPUT);
-	ioport_set_pin_level(PIN_PB12, IOPORT_PIN_LEVEL_HIGH);
+	ioport_set_pin_dir(PIN_PC02,IOPORT_DIR_OUTPUT);
+	ioport_set_pin_level(PIN_PC02, IOPORT_PIN_LEVEL_LOW);
 
 	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
 		MUX_PC01A_SPI_NPCS3);
@@ -864,13 +1081,14 @@ int main(void)
 	display_menu();
 
 	configure_tc();
+	pid_init_data();
 
-	uint8_t motor_test_gpio = 0;
-	uint8_t motor_pwm_a = 127;
-	uint8_t motor_pwm_b = 0;
+	uint8_t enable_close_loop = 0;
 
 	while (1) {
 		scanf("%c", (char *)&uc_key);
+
+
 
 		switch (uc_key) {
 		case 'h':
@@ -884,12 +1102,14 @@ int main(void)
 			readEncoderDiagnostics();
 			break;
 		case 'a':
-			readAttiny24Diagnostics();
+			readAttiny24Diagnostics(SPI_CHIP_PCS_1);
 			break;
 		case 't':
-			for(int i = 0; i < 200; i++)
-				setAttiny24Motor(0x00, 64);
-			setAttiny24Motor(0x03, 1);
+			//for(int i = 0; i < 200; i++)
+				setAttiny24Motor(0x01, 12800, 0, SPI_CHIP_PCS_1);
+			break;
+		case 'y':
+				setAttiny24Motor(0x01, 12800, 0, SPI_CHIP_PCS_5);
 			break;
 		case 'l':
 			printf("Flash stats: start_addr: %x, flash_size: %d \n\r", FLASH_ADDR, FLASH_SIZE);
@@ -899,7 +1119,7 @@ int main(void)
 			store_lookup(angleTest);
 			break;
 		case 'c':
-			calibrate();
+			calibrate(SPI_CHIP_PCS_1);
 			
 
 			break;
@@ -927,11 +1147,32 @@ int main(void)
 			printf("Raw: %d \n\r", raw);
 			break;
 		case 's':
-			oneStep();
+			//oneStep();
+			r += 1.8;
+			printf("Setpoint[step] = ");
+			char str2[8];
+			snprintf(str, sizeof(str2), "%f", r);
+			printf(" %s \n\r",str2);
+
+			break;
+		case 'w':
+			enable_close_loop ^= 1;
+			if(enable_close_loop)
+			{
+				
+				printf("Enabling close loop control! \n\r");
+				tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
+			}
+			else
+			{
+				printf("Disabling close loop control! \n\r");
+				tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
+			}
 			break;
 		default:
 			break;
 		}
+
 	}
 }
 
