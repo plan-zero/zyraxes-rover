@@ -238,7 +238,7 @@ void motor_calibrate(uMotorID motorID) {
   puts("motor_calibrate: Beginning calibration routine ... \n\r");
 
   encoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
-  int dir = MOTOR_FORWARD;
+  int dir = MOTOR_REVERSE;
   motor_one_step(motorID, dir);
   delay_ms(500);
 
