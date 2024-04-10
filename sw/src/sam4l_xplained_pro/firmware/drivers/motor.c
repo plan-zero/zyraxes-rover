@@ -405,5 +405,6 @@ void motor_calibrate(uMotorID motorID) {
 
   puts("Calibration complete! \n\r");
   puts("The calibration table has been written to non-volatile Flash memory! \n\r");
+  page_number = 0;
 
 }

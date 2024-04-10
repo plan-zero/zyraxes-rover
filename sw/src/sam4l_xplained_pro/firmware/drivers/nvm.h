@@ -10,7 +10,7 @@
 
 extern unsigned page_count;
 extern const void * page_ptr;
-
+extern int page_number;
 void store_lookup(float lookupAngle);
 
 
