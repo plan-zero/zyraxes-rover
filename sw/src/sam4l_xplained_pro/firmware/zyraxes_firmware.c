@@ -52,7 +52,7 @@ static void display_menu(void)
 			"------\r");
 
 	puts("  q: Re-initialize SPI Master\n\r"
-		 "1-8: Select motor\n\r"
+		 "0-7: Select motor\n\r"
 		 "  a: sync\n\r"
 		 "  t: full rotation test\n\r"
 		 "  d: DIAG\n\r"
@@ -165,8 +165,8 @@ int main(void)
 	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
 		MUX_PC01A_SPI_NPCS3);
 
-	motor_init(MOTOR_0, SPI_CHIP_PCS_1, SPI_CHIP_PCS_0);
-	motor_init(MOTOR_2, SPI_CHIP_PCS_5, SPI_CHIP_PCS_4);
+	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1);
+	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5);
 
 
 	//init pointer to the flash first page
@@ -180,45 +180,28 @@ int main(void)
 	uMotorID selected_motor = MOTOR_COUNT;
 	uint8_t selected_dir = MOTOR_FORWARD;
 	int motor_speed = MOTOR_MICROSTEP_WAIT_US;
+	int ati_cmd = 0;
 
 	while (1) {
 		scanf("%c", (char *)&uc_key);
 
 		//m 1,8 a t d f s c p n m h
 		switch (uc_key) {
+		case '0':
 		case '1':
-			puts("Select MOTOR_0 \n\r");
-			selected_motor = MOTOR_0;
-			break;
 		case '2':
-			puts("Select MOTOR_1 \n\r");
-			selected_motor = MOTOR_1;
-			break;
 		case '3':
-			puts("Select MOTOR_2 \n\r");
-			selected_motor = MOTOR_2;
-			break;
 		case '4':
-			puts("Select MOTOR_3 \n\r");
-			selected_motor = MOTOR_3;
-			break;
 		case '5':
-			puts("Select MOTOR_4 \n\r");
-			selected_motor = MOTOR_4;
-			break;
 		case '6':
-			puts("Select MOTOR_5 \n\r");
-			selected_motor = MOTOR_5;
-			break;
 		case '7':
-			puts("Select MOTOR_6 \n\r");
-			selected_motor = MOTOR_6;
+			ati_cmd = uc_key - '0';
+			printf("Select MOTOR_%d \n\r", ati_cmd);
+			if(motor_get_status(ati_cmd) == STATE_MOTOR_OK)
+				selected_motor = ati_cmd;
+			else
+				printf("MOTOR_%d offline/error! \n\r", ati_cmd);
 			break;
-		case '8':
-			puts("Select MOTOR_7 \n\r");
-			selected_motor = MOTOR_7;
-			break;
-
 		case 'h':
 			display_menu();
 			break;

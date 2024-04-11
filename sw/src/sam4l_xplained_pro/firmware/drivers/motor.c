@@ -136,6 +136,7 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
     int sync_ack = 0;
     printf("motor_init: Initialize motor ID=%d, PCs selected driver %d senzor %d... \n\r", motorID, motorPCs, sensorPCs);
 
+    _motors[motorID].state = STATE_MOTOR_UNKNOWN;
     _motors[motorID].motorPCs = motorPCs;
     _motors[motorID].sensorPCs = sensorPCs;
     printf("motor_init: sync with motor driver, sending... \n\r");
@@ -147,25 +148,37 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
         if(sync_ack == MOTOR_SYNC_ACK)
         {
             printf("motor_init: sync complete \n\r");
+            _motors[motorID].state = STATE_MOTOR_OK;
             break;
         }
     }
 
     if(sync_ack != MOTOR_SYNC_ACK)
     {
-        //TODO: set motor status as error and disable it
+        _motors[motorID].state = STATE_MOTOR_ERROR;
         printf("motor_init: sync error \n\r");
     }
 
 }
 
+sMotorState motor_get_status(uMotorID motorID)
+{
+    return _motors[motorID].state;
+}
+
 void motor_microstep(uMotorID motorID, uint8_t dir)
 {
+    //don't check status as this should be as quick as possible, motor status is checked at a higher level
     _motor_micro_step(_motors[motorID].motorPCs, dir);
 }
 
 void motor_one_step(uMotorID motorID, uint8_t dir)
 {
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_one_step: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
     for(int i = 0; i < MOTOR_MICROSTEP_CONFIG; i++)
     {
         _motor_micro_step(_motors[motorID].motorPCs, dir);
@@ -175,37 +188,60 @@ void motor_one_step(uMotorID motorID, uint8_t dir)
 
 float motor_read_angle(uMotorID motorID)
 {
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_read_angle: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
+    const int avg = 3;
+    int encoderReading = 0;
 
-  const int avg = 3;
-  int encoderReading = 0;
-
-  for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
+    for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
         encoderReading += _motor_read_raw(_motors[motorID].sensorPCs);
         delay_us(10);
     }
 
-  //return encoderReading * (360.0 / 16384.0) / avg;
-  return lookup[motorID][encoderReading / avg];
+    //return encoderReading * (360.0 / 16384.0) / avg;
+    return lookup[motorID][encoderReading / avg];
 
 }
 
 int motor_read_position(uMotorID motorID)
 {
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_read_position: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
     return _motor_read_raw(_motors[motorID].sensorPCs);
 }
 
 void motor_sync(uMotorID motorID)
 {
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_sync: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
     _motor_sync(_motors[motorID].motorPCs);
 }
 
 void motor_diagnoise(uMotorID motorID)
 {
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_diagnoise: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
     _motor_diag(_motors[motorID].sensorPCs);
 }
 
 void motor_printout(uMotorID motorID)
 {
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   printf("motor_printout: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
     puts("motor_printout: print calibration data ... \n\r");
     for(int i = 0; i < MAGNETIC_LUT_SIZE; i++)
     {
@@ -219,192 +255,197 @@ void motor_printout(uMotorID motorID)
 
 void motor_calibrate(uMotorID motorID) { 
 
-  static int cpr = CPR;
-  static float aps = MOTOR_APS;
-  int encoderReading = 0;     //or float?  not sure if we can average for more res?
-  int currentencoderReading = 0;
-  int lastencoderReading = 0;
-  int avg = 10;               //how many readings to average
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_calibrate: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
+    static int cpr = CPR;
+    static float aps = MOTOR_APS;
+    int encoderReading = 0;     //or float?  not sure if we can average for more res?
+    int currentencoderReading = 0;
+    int lastencoderReading = 0;
+    int avg = 10;               //how many readings to average
 
-  int iStart = 0;     //encoder zero position index
-  int jStart = 0;
-  int stepNo = 0;
-  
-  int fullStepReadings[MOTOR_SPR];
-    
-  int fullStep = 0;
-  int ticks = 0;
-  float lookupAngle = 0.0;
-  puts("motor_calibrate: Beginning calibration routine ... \n\r");
+    int iStart = 0;     //encoder zero position index
+    int jStart = 0;
+    int stepNo = 0;
 
-  encoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
-  int dir = MOTOR_REVERSE;
-  motor_one_step(motorID, dir);
-  delay_ms(500);
+    int fullStepReadings[MOTOR_SPR];
 
-  if ((_motor_read_raw(_motors[motorID].sensorPCs) - encoderReading) < 0)   //check which way motor moves when dir = true
-  {
+    int fullStep = 0;
+    int ticks = 0;
+    float lookupAngle = 0.0;
+    puts("motor_calibrate: Beginning calibration routine ... \n\r");
+
+    encoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
+    int dir = MOTOR_REVERSE;
+    motor_one_step(motorID, dir);
+    delay_ms(500);
+
+    if ((_motor_read_raw(_motors[motorID].sensorPCs) - encoderReading) < 0)   //check which way motor moves when dir = true
+    {
     puts("Wired backwards \n\r");    // rewiring either phase should fix this.  You may get a false message if you happen to be near the point where the encoder rolls over...
     return;
-  }
+    }
 
-  while (_motors[motorID].stepNumber != 0) {       //go to step zero
+    while (_motors[motorID].stepNumber != 0) {       //go to step zero
     if (_motors[motorID].stepNumber > 0) {
-      dir = MOTOR_FORWARD;
+        dir = MOTOR_FORWARD;
     }
     else
     {
-      dir = MOTOR_REVERSE;
+        dir = MOTOR_REVERSE;
     }
     motor_one_step(motorID, dir);
     delay_ms(100);
-  }
-  dir = MOTOR_FORWARD;
-  for (int x = 0; x < MOTOR_SPR; x++) {     //step through all full step positions, recording their encoder readings
+    }
+    dir = MOTOR_FORWARD;
+    for (int x = 0; x < MOTOR_SPR; x++) {     //step through all full step positions, recording their encoder readings
 
     encoderReading = 0;
     delay_ms(20);                         //moving too fast may not give accurate readings.  Motor needs time to settle after each step.
     lastencoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
         
     for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
-      currentencoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
+        currentencoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
 
-      if ((currentencoderReading-lastencoderReading)<(-(cpr/2))){
+        if ((currentencoderReading-lastencoderReading)<(-(cpr/2))){
         currentencoderReading += cpr;
-      }
-      else if ((currentencoderReading-lastencoderReading)>((cpr/2))){
+        }
+        else if ((currentencoderReading-lastencoderReading)>((cpr/2))){
         currentencoderReading -= cpr;
-      }
- 
-      encoderReading += currentencoderReading;
-      delay_ms(10);
-      lastencoderReading = currentencoderReading;
+        }
+
+        encoderReading += currentencoderReading;
+        delay_ms(10);
+        lastencoderReading = currentencoderReading;
     }
     encoderReading = encoderReading / avg;
     if (encoderReading>cpr){
-      encoderReading-= cpr;
+        encoderReading-= cpr;
     }
     else if (encoderReading<0){
-      encoderReading+= cpr;
+        encoderReading+= cpr;
     }
 
     fullStepReadings[x] = encoderReading;
-   // SerialUSB.println(fullStepReadings[x], DEC);      //print readings as a sanity check
+    // SerialUSB.println(fullStepReadings[x], DEC);      //print readings as a sanity check
     if (x % 20 == 0)
     {
-      printf("\n\r DBG: %d \n\r", 100*x/MOTOR_SPR);
-      
+        printf("\n\r DBG: %d \n\r", 100*x/MOTOR_SPR);
+        
     } else {
-      printf(".");
+        printf(".");
     }
-    
-    motor_one_step(motorID, dir);
-  	}
-      puts("\n\r");
 
- 
-  for (int i = 0; i < MOTOR_SPR; i++) {
+    motor_one_step(motorID, dir);
+    }
+        puts("\n\r");
+
+
+    for (int i = 0; i < MOTOR_SPR; i++) {
     ticks = fullStepReadings[mod((i + 1), MOTOR_SPR)] - fullStepReadings[mod((i), MOTOR_SPR)];
     if (ticks < -CPR_THRESHOLD) {
-      ticks += cpr;
+        ticks += cpr;
 
     }
     else if (ticks > CPR_THRESHOLD) {
-      ticks -= cpr;
+        ticks -= cpr;
     }
-   // SerialUSB.println(ticks);
+    // SerialUSB.println(ticks);
 
     if (ticks > 1) {                                    //note starting point with iStart,jStart
-      for (int j = 0; j < ticks; j++) {
+        for (int j = 0; j < ticks; j++) {
         stepNo = (mod(fullStepReadings[i] + j, cpr));
         // SerialUSB.println(stepNo);
         if (stepNo == 0) {
-          iStart = i;
-          jStart = j;
+            iStart = i;
+            jStart = j;
         }
 
-      }
+        }
     }
 
     if (ticks < 1) {                                    //note starting point with iStart,jStart
-      for (int j = -ticks; j > 0; j--) {
+        for (int j = -ticks; j > 0; j--) {
         stepNo = (mod(fullStepReadings[MOTOR_SPR - 1 - i] + j, cpr));
         // SerialUSB.println(stepNo);
         if (stepNo == 0) {
-          iStart = i;
-          jStart = j;
+            iStart = i;
+            jStart = j;
         }
 
-      }
+        }
     }
 
-  }
+    }
 
-  // The code below generates the lookup table by intepolating between
-  // full steps and mapping each encoder count to a calibrated angle
-  // The lookup table is too big to store in volatile memory,
-  // so we must generate and store it into the flash on the fly
+    // The code below generates the lookup table by intepolating between
+    // full steps and mapping each encoder count to a calibrated angle
+    // The lookup table is too big to store in volatile memory,
+    // so we must generate and store it into the flash on the fly
 
-  // begin the write to the calibration table
-  page_count = 0;
-  page_ptr = (const uint8_t*) lookup[motorID];
-  puts("Writing to flash 0x \n\r");
-  printf("%x ", page_ptr);
+    // begin the write to the calibration table
+    page_count = 0;
+    page_ptr = (const uint8_t*) lookup[motorID];
+    puts("Writing to flash 0x \n\r");
+    printf("%x ", page_ptr);
 
-  for (int i = iStart; i < (iStart + MOTOR_SPR + 1); i++) {
+    for (int i = iStart; i < (iStart + MOTOR_SPR + 1); i++) {
     ticks = fullStepReadings[mod((i + 1), MOTOR_SPR)] - fullStepReadings[mod((i), MOTOR_SPR)];
 
     if (ticks < -CPR_THRESHOLD) {           //check if current interval wraps over encoder's zero positon
-      ticks += cpr;
+        ticks += cpr;
     }
     else if (ticks > CPR_THRESHOLD) {
-      ticks -= cpr;
+        ticks -= cpr;
     }
     //Here we print an interpolated angle corresponding to each encoder count (in order)
     if (ticks > 1) {              //if encoder counts were increasing during cal routine...
 
-      if (i == iStart) { //this is an edge case
+        if (i == iStart) { //this is an edge case
         for (int j = jStart; j < ticks; j++) {
-	  store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+        store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
         }
-      }
+        }
 
-      else if (i == (iStart + MOTOR_SPR)) { //this is an edge case
+        else if (i == (iStart + MOTOR_SPR)) { //this is an edge case
         for (int j = 0; j < jStart; j++) {
-	  store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+        store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
         }
-      }
-      else {                        //this is the general case
+        }
+        else {                        //this is the general case
         for (int j = 0; j < ticks; j++) {
-	  store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+        store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
         }
-      }
+        }
     }
 
     else if (ticks < 1) {             //similar to above... for case when encoder counts were decreasing during cal routine
-      if (i == iStart) {
+        if (i == iStart) {
         for (int j = - ticks; j > (jStart); j--) {
-          store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+            store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
         }
-      }
-      else if (i == iStart + MOTOR_SPR) {
+        }
+        else if (i == iStart + MOTOR_SPR) {
         for (int j = jStart; j > 0; j--) {
-          store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+            store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
         }
-      }
-      else {
+        }
+        else {
         for (int j = - ticks; j > 0; j--) {
-          store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+            store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
         }
-      }
+        }
 
     }
 
 
-  }
+    }
 
-  puts("Calibration complete! \n\r");
-  puts("The calibration table has been written to non-volatile Flash memory! \n\r");
-  page_number = 0;
+    puts("Calibration complete! \n\r");
+    puts("The calibration table has been written to non-volatile Flash memory! \n\r");
+    page_number = 0;
 
 }
