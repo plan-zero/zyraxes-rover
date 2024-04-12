@@ -16,6 +16,8 @@ typedef enum {
 }sMotorState;
 
 typedef struct {
+    uint8_t motorID;
+    uint8_t motorUsePCs;
     uint8_t motorPCs;
     uint8_t sensorPCs;
     uint8_t dir;
@@ -24,7 +26,7 @@ typedef struct {
 }sMotorInstance;
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs);
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t motorUsePCs);
 float motor_read_angle(uMotorID motorID);
 int motor_read_position(uMotorID motorID);
 void motor_one_step(uMotorID motorID, uint8_t dir);
@@ -33,6 +35,7 @@ void motor_diagnoise(uMotorID motorID);
 void motor_calibrate(uMotorID motorID);
 void motor_sync(uMotorID motorID);
 void motor_printout(uMotorID motorID);
+void motor_task();
 sMotorState motor_get_status(uMotorID motorID);
 
 #endif /*MOTOR_H*/

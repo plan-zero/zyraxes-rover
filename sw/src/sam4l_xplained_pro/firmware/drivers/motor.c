@@ -12,7 +12,7 @@ const float __attribute__((__aligned__(512))) lookup[MOTOR_COUNT][MAGNETIC_LUT_S
 //Put lookup table here!
 };
 
-static inline int  _motor_sync(uint8_t PCs);
+static inline int  _motor_sync(uMotorID motorID, uint8_t PCs);
 static inline void  _motor_diag(uint8_t PCs);
 
 sMotorInstance _motors[MOTOR_COUNT];
@@ -94,10 +94,19 @@ static inline void _motor_diag(uint8_t PCs)
   	delay_ms(1);
 }
 
-static inline int  _motor_sync(uint8_t PCs)
+static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
 {
 
 	uint8_t response = 0;
+    uint8_t select_slave = 0;
+
+    if(_motors[motorID].motorUsePCs == 0)
+    {
+        //select slave
+        select_slave |= 1 << motorID;
+        response = spi_sync_transfer(select_slave, PCs, 1);
+        printf("motor_sync_driver: send 0x%x response: 0x%x\n\r", select_slave, response);
+    }
 
 	response = spi_sync_transfer(MOTOR_SYNC_CMD, PCs, 1);
 	printf("motor_sync_driver: send 0x%x response: 0x%x\n\r", MOTOR_SYNC_CMD, response);
@@ -130,7 +139,7 @@ static inline int _motor_read_raw(uint8_t PCs)
 }
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t motorUsePCs)
 {
     static int tryout = 3;
     int sync_ack = 0;
@@ -139,10 +148,15 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
     _motors[motorID].state = STATE_MOTOR_UNKNOWN;
     _motors[motorID].motorPCs = motorPCs;
     _motors[motorID].sensorPCs = sensorPCs;
+    _motors[motorID].motorID = motorID;
+    _motors[motorID].motorUsePCs = motorUsePCs;
+
     printf("motor_init: sync with motor driver, sending... \n\r");
+
+    tryout = 3;
     while(tryout)
     {
-        sync_ack = _motor_sync(_motors[motorID].motorPCs);
+        sync_ack = _motor_sync(motorID, _motors[motorID].motorPCs);
         //wait for atiny24 to startup, should take at least 64ms
         delay_ms(100);
         if(sync_ack == MOTOR_SYNC_ACK)
@@ -151,6 +165,7 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
             _motors[motorID].state = STATE_MOTOR_OK;
             break;
         }
+        tryout--;
     }
 
     if(sync_ack != MOTOR_SYNC_ACK)
@@ -169,18 +184,32 @@ sMotorState motor_get_status(uMotorID motorID)
 void motor_microstep(uMotorID motorID, uint8_t dir)
 {
     //don't check status as this should be as quick as possible, motor status is checked at a higher level
+    if(_motors[motorID].motorUsePCs == 0)
+    {
+        uint8_t select_slave = 0;
+        select_slave |= 1 << motorID;
+        spi_sync_transfer(select_slave, _motors[motorID].motorPCs, 1);
+    }
     _motor_micro_step(_motors[motorID].motorPCs, dir);
 }
 
 void motor_one_step(uMotorID motorID, uint8_t dir)
 {
+    uint8_t select_slave = 0;
     if(STATE_MOTOR_OK != _motors[motorID].state)
     {   
         printf("motor_one_step: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
     }
+
     for(int i = 0; i < MOTOR_MICROSTEP_CONFIG; i++)
     {
+        if(_motors[motorID].motorUsePCs == 0)
+        {
+            
+            select_slave |= 1 << motorID;
+            spi_sync_transfer(select_slave, _motors[motorID].motorPCs, 1);
+        }
         _motor_micro_step(_motors[motorID].motorPCs, dir);
         delay_us(MOTOR_MICROSTEP_WAIT_US);
     }
@@ -223,7 +252,7 @@ void motor_sync(uMotorID motorID)
         printf("motor_sync: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
     }
-    _motor_sync(_motors[motorID].motorPCs);
+    _motor_sync(motorID ,_motors[motorID].motorPCs);
 }
 
 void motor_diagnoise(uMotorID motorID)
@@ -448,4 +477,17 @@ void motor_calibrate(uMotorID motorID) {
     puts("The calibration table has been written to non-volatile Flash memory! \n\r");
     page_number = 0;
 
+}
+
+//motor MAIN task, shall be called in loop
+
+uint8_t broadcast = 0;
+void motor_task()
+{
+    //printf("Motor thread \n\r");
+    //selecting motors
+    //test M0 and M2
+    broadcast |= (1 << MOTOR_0) | (1 << MOTOR_2); 
+    spi_sync_transfer(broadcast, 0, 1);
+    _motor_micro_step(0, MOTOR_FORWARD);
 }

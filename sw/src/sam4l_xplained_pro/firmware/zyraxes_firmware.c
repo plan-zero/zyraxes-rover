@@ -63,10 +63,13 @@ static void display_menu(void)
 		 "  n: speed up \n\r\r"
 		 "  m: speed down \n\r\r"
 		 "  y: toggle direction\n\r\r"
+		 "  w: start motor control loop \n\r"
 		 "  h: Display this menu again\n\r\r");
 
 }
 
+volatile int do_motor_task = 0;
+volatile int count = 0;
 
 void TC00_Handler(void)
 {
@@ -77,7 +80,7 @@ void TC00_Handler(void)
 	/* Avoid compiler warning */
 	UNUSED(ul_dummy);
 
-    
+	do_motor_task = 1;
 
 }
 
@@ -89,7 +92,7 @@ static void configure_tc(void)
 	uint32_t ul_div;
 	uint32_t ul_tcclks;
 	uint32_t ul_sysclk = sysclk_get_cpu_hz();
-	uint32_t handler_freq_hz = 50;
+	uint32_t handler_freq_hz = 10000;
 
 	/* Configure TC0 */
 	sysclk_enable_peripheral_clock(TC0);
@@ -106,8 +109,8 @@ static void configure_tc(void)
 	NVIC_EnableIRQ((IRQn_Type) TC00_IRQn);
 	//tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
 
-	/* Start the counter. */
 	tc_start(TC0, 0);
+
 }
 
 
@@ -139,7 +142,7 @@ static void configure_console(void)
  */
 int main(void)
 {
-	uint8_t uc_key;
+	uint32_t uc_key;
 	//uMAX = (255/3.3)*(iMAX*10*rSense);
 
 	/* Initialize the SAM system. */
@@ -165,8 +168,8 @@ int main(void)
 	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
 		MUX_PC01A_SPI_NPCS3);
 
-	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1);
-	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5);
+	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0);
+	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0);
 
 
 	//init pointer to the flash first page
@@ -181,100 +184,126 @@ int main(void)
 	uint8_t selected_dir = MOTOR_FORWARD;
 	int motor_speed = MOTOR_MICROSTEP_WAIT_US;
 	int ati_cmd = 0;
+	int run_timer = 0;
 
 	while (1) {
-		scanf("%c", (char *)&uc_key);
+		//scanf("%c", (char *)&uc_key);
 
 		//m 1,8 a t d f s c p n m h
-		switch (uc_key) {
-		case '0':
-		case '1':
-		case '2':
-		case '3':
-		case '4':
-		case '5':
-		case '6':
-		case '7':
-			ati_cmd = uc_key - '0';
-			printf("Select MOTOR_%d \n\r", ati_cmd);
-			if(motor_get_status(ati_cmd) == STATE_MOTOR_OK)
-				selected_motor = ati_cmd;
-			else
-				printf("MOTOR_%d offline/error! \n\r", ati_cmd);
-			break;
-		case 'h':
-			display_menu();
-			break;
+		if(usart_is_rx_ready(CONF_UART))
+		{
+			usart_getchar(CONF_UART, &uc_key);
+			//printf("recieved char %x \n\r", uc_key);
+			switch (uc_key) {
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+				ati_cmd = uc_key - '0';
+				printf("Select MOTOR_%d \n\r", ati_cmd);
+				if(motor_get_status(ati_cmd) == STATE_MOTOR_OK)
+					selected_motor = ati_cmd;
+				else
+					printf("MOTOR_%d offline/error! \n\r", ati_cmd);
+				break;
+			case 'h':
+				display_menu();
+				break;
 
-		case 'q':
-			spi_master_initialize();
-			break;
-		case 'd':
-			if(selected_motor < MOTOR_COUNT)
-				motor_diagnoise(selected_motor);
-			break;
-		case 'a':
-			if(selected_motor < MOTOR_COUNT)
-				motor_sync(selected_motor);
-			break;
-		case 't':
-			printf("Do 360 rotation test on motor: %d  \n\r", selected_motor);
-			if(selected_motor < MOTOR_COUNT)
-				for(int i = 0; i < MOTOR_SPR * MOTOR_MICROSTEP_CONFIG; i++){
-					motor_microstep(selected_motor, selected_dir);
-					delay_us(motor_speed);
+			case 'q':
+				spi_master_initialize();
+				break;
+			case 'd':
+				if(selected_motor < MOTOR_COUNT)
+					motor_diagnoise(selected_motor);
+				break;
+			case 'a':
+				if(selected_motor < MOTOR_COUNT)
+					motor_sync(selected_motor);
+				break;
+			case 't':
+				printf("Do 360 rotation test on motor: %d  \n\r", selected_motor);
+				if(selected_motor < MOTOR_COUNT)
+					for(int i = 0; i < MOTOR_SPR * MOTOR_MICROSTEP_CONFIG; i++){
+						motor_microstep(selected_motor, selected_dir);
+						delay_us(motor_speed);
+					}
+				break;
+			case 'y':
+				puts("Toggle dir! \n\r");
+				if(selected_dir == MOTOR_FORWARD)
+				{
+					puts("Motor reverse! \n\r");
+					selected_dir = MOTOR_REVERSE;
 				}
-			break;
-		case 'y':
-			puts("Toggle dir! \n\r");
-			if(selected_dir == MOTOR_FORWARD)
-			{
-				puts("Motor reverse! \n\r");
-				selected_dir = MOTOR_REVERSE;
-			}
-			else
-			{
-				puts("Motor forward! \n\r");
-				selected_dir = MOTOR_FORWARD;
-			}
-			break;
+				else
+				{
+					puts("Motor forward! \n\r");
+					selected_dir = MOTOR_FORWARD;
+				}
+				break;
 
-		case 'c':
-			if(selected_motor < MOTOR_COUNT)
-				motor_calibrate(selected_motor);
+			case 'c':
+				if(selected_motor < MOTOR_COUNT)
+					motor_calibrate(selected_motor);
 
-			break;
-		case 'p':
-			if(selected_motor < MOTOR_COUNT)
-				motor_printout(selected_motor);
-			break;
-		case 'f':
-			if(selected_motor < MOTOR_COUNT)
-			{
-				printf("Angle: ");
-				float angle = motor_read_angle(selected_motor);
-				char str[8];
-				snprintf(str, sizeof(str), "%f", angle);
-				printf(" %s \n\r",str);
-				int raw = motor_read_position(selected_motor);
-				printf("Raw: %d \n\r", raw);
+				break;
+			case 'p':
+				if(selected_motor < MOTOR_COUNT)
+					motor_printout(selected_motor);
+				break;
+			case 'f':
+				if(selected_motor < MOTOR_COUNT)
+				{
+					printf("Angle: ");
+					float angle = motor_read_angle(selected_motor);
+					char str[8];
+					snprintf(str, sizeof(str), "%f", angle);
+					printf(" %s \n\r",str);
+					int raw = motor_read_position(selected_motor);
+					printf("Raw: %d \n\r", raw);
+				}
+				break;
+			case 's':
+				if(selected_motor < MOTOR_COUNT)
+					motor_one_step(selected_motor, selected_dir);
+				break;
+			case 'n':
+				puts("Increase speed with 10p! \n\r");
+				if(motor_speed > MOTOR_MICROSTEP_WAIT_US)
+					motor_speed -= 10;
+				break;
+			case 'm':
+				puts("Decrease speed with 10p! \n\r");
+				motor_speed += 10;
+				break;
+			case 'w':
+				/* Start the counter. */
+				if(run_timer == 0)
+				{
+					puts("Start motor task \n\r");
+					tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
+					run_timer = 1;
+				}
+				else
+				{
+					puts("Stop motor task \n\r");
+					tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
+					run_timer = 0;
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		case 's':
-			if(selected_motor < MOTOR_COUNT)
-				motor_one_step(selected_motor, selected_dir);
-			break;
-		case 'n':
-			puts("Increase speed with 10p! \n\r");
-			if(motor_speed > MOTOR_MICROSTEP_WAIT_US)
-				motor_speed -= 10;
-			break;
-		case 'm':
-			puts("Decrease speed with 10p! \n\r");
-			motor_speed += 10;
-			break;
-		default:
-			break;
+		}
+
+		if(do_motor_task){
+			motor_task();
+			do_motor_task = 0;
 		}
 
 	}

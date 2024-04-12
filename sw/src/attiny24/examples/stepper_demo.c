@@ -24,7 +24,7 @@
 #include <math.h>
 
 
-#include "sin_lut_microstep_32.h"
+#include "sin_lut_microstep_16.h"
 
 #define IN1 PA0
 #define IN2 PA1
@@ -33,7 +33,7 @@
 
 #define INPORT PORTA
 
-#define EFFORT 37
+#define EFFORT 40
 
 // NEMA17 no gearbox
 //measured 12.625 us 
@@ -115,7 +115,7 @@ int main(){
     for(uint32_t i=0; i < 6400 * 2; i++)
     {
       output();
-      _delay_us(55);
+      _delay_us(75);
     }
 
     PORTB |= 1 << PB0;

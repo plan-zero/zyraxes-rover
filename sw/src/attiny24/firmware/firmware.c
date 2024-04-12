@@ -17,6 +17,8 @@
 #define SLAVE_STEP		0x77
 #define SLAVE_RESERVED	0x00
 
+#define SLAVE_ID			2
+
 #define MASTER_MASK			0xC0
 #define MASTER_SYNC			0xC0
 #define MASTER_DOSTEP_REV	0x40
@@ -32,7 +34,7 @@
 
 #define EFFORT 37
 
-
+#define ENABLE_CS 0
 
 static inline void step(int8_t dir)
 {
@@ -76,6 +78,7 @@ int main()
 {
 
 	uint8_t in_data = 0;
+	uint8_t slave_selected = 0;
 	uint8_t new_data = 0;
 	spiX_initslave(SPIMODE);	// Init SPI driver as slave.
 	sei();		// Must do this to make driver work.
@@ -97,6 +100,40 @@ int main()
 	
 	do {
 
+#if (ENABLE_CS == 0)
+		//no cs is used, check if this slave is selected
+		if ( ((in_data >> SLAVE_ID) & 0x1) && (!slave_selected) )
+		{
+			slave_selected = 1;
+			spiX_put(SLAVE_SYNC);
+		}
+		else if(slave_selected && new_data)
+		{
+			if( (in_data & MASTER_MASK) == MASTER_DOSTEP)
+			{
+				step(1);
+				spiX_put(SLAVE_STEP);
+				in_data = 0;
+				PORTB |= 1 << PB0;
+			}
+			else if( (in_data & MASTER_MASK) == MASTER_DOSTEP_REV)
+			{
+				step(-1);
+				spiX_put(SLAVE_STEP);
+				in_data = 0;
+				PORTB |= 1 << PB0;
+			}
+			else if( (in_data & MASTER_MASK) == MASTER_SYNC)
+			{
+				//TODO: send some status here
+				spiX_put(SLAVE_SYNC);
+				in_data = 0;
+				PORTB |= 1 << PB0;
+			}
+			slave_selected = 0;
+			new_data = 0;
+		}
+#else
 		if( (in_data & MASTER_MASK) == MASTER_DOSTEP)
 		{
 			step(1);
@@ -118,14 +155,16 @@ int main()
 			in_data = 0;
 			PORTB |= 1 << PB0;
 		}
+#endif
 
-
-
+#if (ENABLE_CS == 1)
 		if(spiX_start_transfer())
+#endif
 		{
 			spiX_wait();		// wait for transmission to finish
 			in_data = spiX_get();	// and finally put result on PORTB.
 			PORTB &= ~(1 << PB0);
+			new_data = 1;
 		}
 		
 		
