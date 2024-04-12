@@ -64,6 +64,8 @@ static void display_menu(void)
 		 "  m: speed down \n\r\r"
 		 "  y: toggle direction\n\r\r"
 		 "  w: start motor control loop \n\r"
+		 "  i: Increase RPM \n\r"
+		 "  o: Decrease RPM \n\r"
 		 "  h: Display this menu again\n\r\r");
 
 }
@@ -87,12 +89,12 @@ void TC00_Handler(void)
 /**
  *  Configure Timer Counter 0 to generate an interrupt every 200ms.
  */
-static void configure_tc(void)
+static void configure_tc(uint32_t freq)
 {
 	uint32_t ul_div;
 	uint32_t ul_tcclks;
 	uint32_t ul_sysclk = sysclk_get_cpu_hz();
-	uint32_t handler_freq_hz = 10000;
+	uint32_t handler_freq_hz = freq;
 
 	/* Configure TC0 */
 	sysclk_enable_peripheral_clock(TC0);
@@ -178,14 +180,15 @@ int main(void)
 	/* Display menu. */
 	display_menu();
 
-	configure_tc();
+	configure_tc(10000);
 
 	uMotorID selected_motor = MOTOR_COUNT;
 	uint8_t selected_dir = MOTOR_FORWARD;
 	int motor_speed = MOTOR_MICROSTEP_WAIT_US;
 	int ati_cmd = 0;
 	int run_timer = 0;
-
+	int interrupt_us = 0;
+	int interrupt_hz = 0;
 	while (1) {
 		//scanf("%c", (char *)&uc_key);
 
@@ -296,6 +299,20 @@ int main(void)
 					run_timer = 0;
 				}
 				break;
+			case 'i':
+				interrupt_us = motor_set_rpm(selected_motor, 100);
+				interrupt_hz = 1000000 / interrupt_us;
+				tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
+				tc_stop(TC0, 0);
+				configure_tc(interrupt_hz);
+			break;
+			case 'o':
+				interrupt_us = motor_set_rpm(selected_motor, 180);
+				interrupt_hz = 1000000 / interrupt_us;
+				tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
+				tc_stop(TC0, 0);
+				configure_tc(interrupt_hz);
+			break;
 			default:
 				break;
 			}

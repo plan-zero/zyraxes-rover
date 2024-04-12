@@ -8,6 +8,8 @@
 #define MOTOR_SYNC_CMD  0xc0
 #define MOTOR_SYNC_ACK  0xAA
 
+#define BROADCAST_NO_CS 0
+
 const float __attribute__((__aligned__(512))) lookup[MOTOR_COUNT][MAGNETIC_LUT_SIZE] = {
 //Put lookup table here!
 };
@@ -481,6 +483,26 @@ void motor_calibrate(uMotorID motorID) {
 
 //motor MAIN task, shall be called in loop
 
+int motor_set_rpm(uMotorID motorID, uint32_t RPM)
+{
+    //calculate desired microstep delay
+    int microstep_wait = 0;
+
+    microstep_wait = MINUTE_TO_US / (RPM * MOTOR_MICROSTEP_CONFIG * MOTOR_SPR);
+    printf("motor_set_rpm: desired RPM: %d, calulated value microstep us: %d \n\r", RPM, microstep_wait);
+    //set the threshold
+    if(microstep_wait < MOTOR_MICROSTEP_WAIT_US)
+    {
+        microstep_wait = MOTOR_MICROSTEP_WAIT_US;
+    }
+
+    //set calculated values
+    _motors[motorID].RPM = RPM;
+    _motors[motorID].us_per_microstep = microstep_wait;
+
+    return microstep_wait;
+}
+
 uint8_t broadcast = 0;
 void motor_task()
 {
@@ -488,6 +510,6 @@ void motor_task()
     //selecting motors
     //test M0 and M2
     broadcast |= (1 << MOTOR_0) | (1 << MOTOR_2); 
-    spi_sync_transfer(broadcast, 0, 1);
-    _motor_micro_step(0, MOTOR_FORWARD);
+    spi_sync_transfer(broadcast, BROADCAST_NO_CS, 1);
+    _motor_micro_step(BROADCAST_NO_CS, MOTOR_FORWARD);
 }

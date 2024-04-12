@@ -17,6 +17,7 @@ typedef enum {
 #define MOTOR_MICROSTEP_CONFIG      16
 #define MOTOR_MICROSTEP_WAIT_US     100
 
+#define MINUTE_TO_US 60000000
 #define MOTOR_APS    1.8
 #define MOTOR_SPR 200
 

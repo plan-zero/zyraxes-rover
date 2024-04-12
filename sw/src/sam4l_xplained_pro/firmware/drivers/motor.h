@@ -23,6 +23,8 @@ typedef struct {
     uint8_t dir;
     sMotorState state;
     uint64_t stepNumber;
+    uint32_t us_per_microstep;
+    uint32_t RPM;
 }sMotorInstance;
 
 
@@ -37,5 +39,6 @@ void motor_sync(uMotorID motorID);
 void motor_printout(uMotorID motorID);
 void motor_task();
 sMotorState motor_get_status(uMotorID motorID);
+int motor_set_rpm(uMotorID motorID, uint32_t RPM);
 
 #endif /*MOTOR_H*/
