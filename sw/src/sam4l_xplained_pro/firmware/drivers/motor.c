@@ -152,6 +152,8 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t m
     _motors[motorID].sensorPCs = sensorPCs;
     _motors[motorID].motorID = motorID;
     _motors[motorID].motorUsePCs = motorUsePCs;
+    _motors[motorID].us_per_microstep = 0;
+    _motors[motorID].RPM = 0;
 
     printf("motor_init: sync with motor driver, sending... \n\r");
 
@@ -493,9 +495,15 @@ int motor_set_rpm(uMotorID motorID, uint32_t RPM)
     //set the threshold
     if(microstep_wait < MOTOR_MICROSTEP_WAIT_US)
     {
-        microstep_wait = MOTOR_MICROSTEP_WAIT_US;
+        microstep_wait = MOTOR_MICROSTEP_WAIT_US / 50;
     }
-
+    else
+    {
+        microstep_wait = (microstep_wait + 25)/ 50;
+    }
+    //recalculate RPM: 
+    RPM = MINUTE_TO_US / (microstep_wait * 50 * MOTOR_MICROSTEP_CONFIG * MOTOR_SPR);
+    printf("motor_set_rpm: truncated value RPM: %d TASK wait: %d \n\r", RPM, microstep_wait);
     //set calculated values
     _motors[motorID].RPM = RPM;
     _motors[motorID].us_per_microstep = microstep_wait;
@@ -504,12 +512,29 @@ int motor_set_rpm(uMotorID motorID, uint32_t RPM)
 }
 
 uint8_t broadcast = 0;
+int task_count = 1;
+uint8_t do_update_motors = 0;
 void motor_task()
 {
     //printf("Motor thread \n\r");
     //selecting motors
     //test M0 and M2
-    broadcast |= (1 << MOTOR_0) | (1 << MOTOR_2); 
-    spi_sync_transfer(broadcast, BROADCAST_NO_CS, 1);
-    _motor_micro_step(BROADCAST_NO_CS, MOTOR_FORWARD);
+    do_update_motors = 0;
+    broadcast = 0;
+    for(uMotorID motor = MOTOR_0; motor < 3; motor++)
+    {
+        if( (task_count % _motors[motor].us_per_microstep) == 0)
+        {
+            broadcast |= (1 << motor);
+            do_update_motors = 1;
+        }
+    }
+   if(do_update_motors)
+   {
+        spi_sync_transfer(broadcast, BROADCAST_NO_CS, 1);
+        _motor_micro_step(BROADCAST_NO_CS, MOTOR_FORWARD);
+   }
+
+    
+    task_count++;
 }

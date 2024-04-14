@@ -23,7 +23,7 @@ typedef struct {
     uint8_t dir;
     sMotorState state;
     uint64_t stepNumber;
-    uint32_t us_per_microstep;
+    int us_per_microstep;
     uint32_t RPM;
 }sMotorInstance;
 

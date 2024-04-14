@@ -167,6 +167,10 @@ int main(void)
 	ioport_set_pin_dir(PIN_PC02,IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(PIN_PC02, IOPORT_PIN_LEVEL_LOW);
 
+	//INIT CS for Encoder
+	ioport_set_pin_dir(PIN_PC08,IOPORT_DIR_OUTPUT);
+	ioport_set_pin_level(PIN_PC08, IOPORT_PIN_LEVEL_HIGH);
+
 	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
 		MUX_PC01A_SPI_NPCS3);
 
@@ -180,7 +184,8 @@ int main(void)
 	/* Display menu. */
 	display_menu();
 
-	configure_tc(10000);
+	//50us
+	configure_tc(20000);
 
 	uMotorID selected_motor = MOTOR_COUNT;
 	uint8_t selected_dir = MOTOR_FORWARD;
@@ -300,18 +305,18 @@ int main(void)
 				}
 				break;
 			case 'i':
-				interrupt_us = motor_set_rpm(selected_motor, 100);
-				interrupt_hz = 1000000 / interrupt_us;
-				tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
-				tc_stop(TC0, 0);
-				configure_tc(interrupt_hz);
+				interrupt_us = motor_set_rpm(selected_motor, 150);
+				//interrupt_hz = 1000000 / interrupt_us;
+				//tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
+				//tc_stop(TC0, 0);
+				//configure_tc(interrupt_hz);
 			break;
 			case 'o':
 				interrupt_us = motor_set_rpm(selected_motor, 180);
-				interrupt_hz = 1000000 / interrupt_us;
-				tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
-				tc_stop(TC0, 0);
-				configure_tc(interrupt_hz);
+				//interrupt_hz = 1000000 / interrupt_us;
+				//tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
+				//tc_stop(TC0, 0);
+				//configure_tc(interrupt_hz);
 			break;
 			default:
 				break;
@@ -319,8 +324,10 @@ int main(void)
 		}
 
 		if(do_motor_task){
+			ioport_set_pin_level(PIN_PC08, IOPORT_PIN_LEVEL_LOW);
 			motor_task();
 			do_motor_task = 0;
+			ioport_set_pin_level(PIN_PC08, IOPORT_PIN_LEVEL_HIGH);
 		}
 
 	}
