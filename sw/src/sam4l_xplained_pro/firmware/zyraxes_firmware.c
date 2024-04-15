@@ -66,6 +66,8 @@ static void display_menu(void)
 		 "  w: start motor control loop \n\r"
 		 "  i: Increase RPM \n\r"
 		 "  o: Decrease RPM \n\r"
+		 "  b: Break all motors \n\r"
+		 "  k: Dev SPI tryout \n\r"
 		 "  h: Display this menu again\n\r\r");
 
 }
@@ -194,6 +196,9 @@ int main(void)
 	int run_timer = 0;
 	int interrupt_us = 0;
 	int interrupt_hz = 0;
+
+	uint8_t spi_data1 = 0, spi_data2 = 0, spi_data3 = 0;
+	int toggle = 0;
 	while (1) {
 		//scanf("%c", (char *)&uc_key);
 
@@ -236,10 +241,10 @@ int main(void)
 			case 't':
 				printf("Do 360 rotation test on motor: %d  \n\r", selected_motor);
 				if(selected_motor < MOTOR_COUNT)
-					for(int i = 0; i < MOTOR_SPR * MOTOR_MICROSTEP_CONFIG; i++){
-						motor_microstep(selected_motor, selected_dir);
-						delay_us(motor_speed);
-					}
+				{
+					motor_microstep(selected_motor, selected_dir,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 180);
+					delay_us(motor_speed);
+				}
 				break;
 			case 'y':
 				puts("Toggle dir! \n\r");
@@ -305,18 +310,37 @@ int main(void)
 				}
 				break;
 			case 'i':
-				interrupt_us = motor_set_rpm(selected_motor, 150);
-				//interrupt_hz = 1000000 / interrupt_us;
-				//tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
-				//tc_stop(TC0, 0);
-				//configure_tc(interrupt_hz);
+				motor_set_rpm(selected_motor, selected_dir, 150);
+
 			break;
 			case 'o':
-				interrupt_us = motor_set_rpm(selected_motor, 180);
-				//interrupt_hz = 1000000 / interrupt_us;
-				//tc_disable_interrupt(TC0, 0, TC_IER_CPCS);
-				//tc_stop(TC0, 0);
-				//configure_tc(interrupt_hz);
+				motor_set_rpm(selected_motor, selected_dir, 180);
+
+			break;
+			case 'b':
+				for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
+				{
+					if(motor_get_status(i) == STATE_MOTOR_OK)
+						motor_microstep(i, 0, 0, 0);
+				}
+			break;
+			case 'k':
+
+				if(toggle)
+				{
+					spi_data1 = spi_sync_transfer(0x7F, SPI_CHIP_PCS_0, 0);
+					spi_data2 = spi_sync_transfer(0xff, SPI_CHIP_PCS_0, 0);
+					spi_data3 = spi_sync_transfer(187, SPI_CHIP_PCS_0, 1);
+					printf("SPI: %x%x%x \n\r", spi_data1, spi_data2, spi_data3);
+				}
+				else
+				{
+					spi_data1 = spi_sync_transfer(0x6C, SPI_CHIP_PCS_0, 0);
+					spi_data2 = spi_sync_transfer(0x80, SPI_CHIP_PCS_0, 0);
+					spi_data3 = spi_sync_transfer(187, SPI_CHIP_PCS_0, 1);
+					printf("SPI: %x%x%x \n\r", spi_data1, spi_data2, spi_data3);
+				}
+				toggle ^= 1;
 			break;
 			default:
 				break;

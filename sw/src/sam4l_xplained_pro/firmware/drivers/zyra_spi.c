@@ -17,10 +17,10 @@
 #define SPI_CLK_PHASE 1
 
 /* Delay before SPCK. */
-#define SPI_DLYBS 180
+#define SPI_DLYBS 200
 
 /* Delay between consecutive transfers. */
-#define SPI_DLYBCT 20
+#define SPI_DLYBCT 25
 
 
 /* Chip select. */

@@ -6,6 +6,7 @@
 #include "string.h"
 
 #define MOTOR_SYNC_CMD  0xc0
+#define MOTOR_STEP_CMD  0x40
 #define MOTOR_SYNC_ACK  0xAA
 
 #define BROADCAST_NO_CS 0
@@ -102,28 +103,27 @@ static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
 	uint8_t response = 0;
     uint8_t select_slave = 0;
 
-    if(_motors[motorID].motorUsePCs == 0)
-    {
-        //select slave
-        select_slave |= 1 << motorID;
-        response = spi_sync_transfer(select_slave, PCs, 1);
-        printf("motor_sync_driver: send 0x%x response: 0x%x\n\r", select_slave, response);
-    }
-
+    spi_sync_transfer(MOTOR_SYNC_CMD, PCs, 1);
 	response = spi_sync_transfer(MOTOR_SYNC_CMD, PCs, 1);
 	printf("motor_sync_driver: send 0x%x response: 0x%x\n\r", MOTOR_SYNC_CMD, response);
 
     return response;
 }
 
-static inline void _motor_micro_step( uint8_t PCs, uint8_t dir)
+static inline void _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t steps, uint8_t rpm)
 {
+    uint8_t in_data = 0;
+	uint8_t data[3];
 
-	uint8_t data = 0;
+    data[0] = MOTOR_STEP_CMD | (dir << 5) | ((steps & 0x1fff) >> 8);
+    data[1] = (steps & 0xff);
+    data[2] = rpm;
 
-	data = spi_sync_transfer(dir, PCs, 1);
+    spi_sync_transfer(data[0], PCs, 0);
+	in_data = spi_sync_transfer(data[1], PCs, 0);
+    in_data = spi_sync_transfer(data[2], PCs, 1);
 
-	UNUSED(data);
+	UNUSED(in_data);
 
 }
 
@@ -185,38 +185,15 @@ sMotorState motor_get_status(uMotorID motorID)
     return _motors[motorID].state;
 }
 
-void motor_microstep(uMotorID motorID, uint8_t dir)
+void motor_microstep(uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
 {
-    //don't check status as this should be as quick as possible, motor status is checked at a higher level
-    if(_motors[motorID].motorUsePCs == 0)
-    {
-        uint8_t select_slave = 0;
-        select_slave |= 1 << motorID;
-        spi_sync_transfer(select_slave, _motors[motorID].motorPCs, 1);
-    }
-    _motor_micro_step(_motors[motorID].motorPCs, dir);
+    _motor_micro_step(_motors[motorID].motorPCs, dir, steps, rpm);
 }
 
 void motor_one_step(uMotorID motorID, uint8_t dir)
 {
-    uint8_t select_slave = 0;
-    if(STATE_MOTOR_OK != _motors[motorID].state)
-    {   
-        printf("motor_one_step: motor is not online, state= %d \n\r",  _motors[motorID].state);
-        return;
-    }
-
-    for(int i = 0; i < MOTOR_MICROSTEP_CONFIG; i++)
-    {
-        if(_motors[motorID].motorUsePCs == 0)
-        {
-            
-            select_slave |= 1 << motorID;
-            spi_sync_transfer(select_slave, _motors[motorID].motorPCs, 1);
-        }
-        _motor_micro_step(_motors[motorID].motorPCs, dir);
-        delay_us(MOTOR_MICROSTEP_WAIT_US);
-    }
+        _motor_micro_step(_motors[motorID].motorPCs, dir, 16, 187);
+        delay_us(187 * MOTOR_MICROSTEP_WAIT_US);
 }
 
 float motor_read_angle(uMotorID motorID)
@@ -485,56 +462,24 @@ void motor_calibrate(uMotorID motorID) {
 
 //motor MAIN task, shall be called in loop
 
-int motor_set_rpm(uMotorID motorID, uint32_t RPM)
+void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
 {
     //calculate desired microstep delay
     int microstep_wait = 0;
 
     microstep_wait = MINUTE_TO_US / (RPM * MOTOR_MICROSTEP_CONFIG * MOTOR_SPR);
     printf("motor_set_rpm: desired RPM: %d, calulated value microstep us: %d \n\r", RPM, microstep_wait);
-    //set the threshold
-    if(microstep_wait < MOTOR_MICROSTEP_WAIT_US)
-    {
-        microstep_wait = MOTOR_MICROSTEP_WAIT_US / 50;
-    }
-    else
-    {
-        microstep_wait = (microstep_wait + 25)/ 50;
-    }
-    //recalculate RPM: 
-    RPM = MINUTE_TO_US / (microstep_wait * 50 * MOTOR_MICROSTEP_CONFIG * MOTOR_SPR);
-    printf("motor_set_rpm: truncated value RPM: %d TASK wait: %d \n\r", RPM, microstep_wait);
-    //set calculated values
+
+    _motors[motorID].dir = dir;
     _motors[motorID].RPM = RPM;
     _motors[motorID].us_per_microstep = microstep_wait;
 
-    return microstep_wait;
+    _motor_micro_step( _motors[motorID].motorPCs, _motors[motorID].dir, 0x1fff, RPM);
+
 }
 
-uint8_t broadcast = 0;
-int task_count = 1;
-uint8_t do_update_motors = 0;
+
 void motor_task()
 {
-    //printf("Motor thread \n\r");
-    //selecting motors
-    //test M0 and M2
-    do_update_motors = 0;
-    broadcast = 0;
-    for(uMotorID motor = MOTOR_0; motor < 3; motor++)
-    {
-        if( (task_count % _motors[motor].us_per_microstep) == 0)
-        {
-            broadcast |= (1 << motor);
-            do_update_motors = 1;
-        }
-    }
-   if(do_update_motors)
-   {
-        spi_sync_transfer(broadcast, BROADCAST_NO_CS, 1);
-        _motor_micro_step(BROADCAST_NO_CS, MOTOR_FORWARD);
-   }
 
-    
-    task_count++;
 }

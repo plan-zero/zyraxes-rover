@@ -8,21 +8,10 @@
 #include <util/delay.h>
 
 
+
 #define SPIMODE 0	// Sample on leading _rising_ edge, setup on trailing _falling_ edge.
-//#define SPIMODE 1	// Sample on leading _falling_ edge, setup on trailing _rising_ edge.
 
-
-#define SLAVE_SYNC 		0xAA
-#define SLAVE_ERROR		0x55
-#define SLAVE_STEP		0x77
-#define SLAVE_RESERVED	0x00
-
-#define SLAVE_ID			2
-
-#define MASTER_MASK			0xC0
-#define MASTER_SYNC			0xC0
-#define MASTER_DOSTEP_REV	0x40
-#define MASTER_DOSTEP		0x80
+#define RPM_CONST 18750
 
 
 #define IN1	PA0
@@ -34,7 +23,6 @@
 
 #define EFFORT 37
 
-#define ENABLE_CS 0
 
 static inline void step(int8_t dir)
 {
@@ -73,19 +61,23 @@ static inline void step(int8_t dir)
   }
 }
 
+#define TIMER_INTERVAL_US 100
+#define TIMER_CONSTANT	(F_CPU / 8 / 1000000)
 
-int main()
-{
+void timer_init() {
+    // Set CTC mode with OCR1A as top value
+    TCCR1B |= (1 << WGM12);
+    
+    // Set prescaler to 8
+    TCCR1B |= (1 << CS11);
+    
+    // Set compare match value for 100us
+    OCR1A = TIMER_CONSTANT * TIMER_INTERVAL_US;
 
-	uint8_t in_data = 0;
-	uint8_t slave_selected = 0;
-	uint8_t new_data = 0;
-	spiX_initslave(SPIMODE);	// Init SPI driver as slave.
-	sei();		// Must do this to make driver work.
+	// Reset timer count reg to zero
+	TCNT1 = 0;
 
-	spiX_put(SLAVE_SYNC);
-
-	//configure PWM
+	//Configure PWM for motor control
     TCCR0A |= _BV(COM0B1) | _BV(COM0A1) | _BV(WGM01) | _BV(WGM00);
     TCCR0B |= _BV(CS00);
 	DDRB |= _BV(PB2);
@@ -93,80 +85,95 @@ int main()
     OCR0A = 0;
     OCR0B = 0;
 
+	
+}
+
+static inline void start_timer(uint16_t cmp_match)
+{
+	OCR1A = TIMER_CONSTANT * cmp_match;
+	TCNT1 = 0;
+	TIMSK1 |= (1 << OCIE1A);
+}
+
+static inline void stop_timer()
+{
+	TIMSK1 &= ~(1 << OCIE1A);
+}
+
+volatile char timer_triggered = 0;
+ISR(TIM1_COMPA_vect) {
+	timer_triggered = 1;
+}
+
+
+
+int main()
+{
+
+	
+	timer_init();
+	spiX_initslave(SPIMODE);	// Init SPI driver as slave.
+	sei();		// Must do this to make driver work.
+
+
 	//Configure IN1-4 as output
 	DDRA |= _BV(IN1) | _BV(IN2) | _BV(IN3) | _BV(IN4);
 	DDRB |= 1 << PB0;
 	PORTB |= 1 << PB0;
 	
+	uint16_t steps_to_do = 0;
+	uint8_t task = 0;
+	int8_t dir = 0;
+	uint8_t master_cmd = 0;
+	uint16_t rpm_to_us = 0;
+	spiX_put(SlaveSYNC);
+
 	do {
 
-#if (ENABLE_CS == 0)
-		//no cs is used, check if this slave is selected
-		if ( ((in_data >> SLAVE_ID) & 0x1) && (!slave_selected) )
+		if(timer_triggered)
 		{
-			slave_selected = 1;
-			spiX_put(SLAVE_SYNC);
-		}
-		else if(slave_selected && new_data)
-		{
-			if( (in_data & MASTER_MASK) == MASTER_DOSTEP)
+			if(steps_to_do)
 			{
-				step(1);
-				spiX_put(SLAVE_STEP);
-				in_data = 0;
-				PORTB |= 1 << PB0;
+				
+				step(dir);
+				//if this is free running
+				if(steps_to_do != 0x1fff)
+					steps_to_do--;
 			}
-			else if( (in_data & MASTER_MASK) == MASTER_DOSTEP_REV)
+			else
 			{
-				step(-1);
-				spiX_put(SLAVE_STEP);
-				in_data = 0;
-				PORTB |= 1 << PB0;
+				stop_timer();
+				PORTB |= (1 << PB0);
 			}
-			else if( (in_data & MASTER_MASK) == MASTER_SYNC)
-			{
-				//TODO: send some status here
-				spiX_put(SLAVE_SYNC);
-				in_data = 0;
-				PORTB |= 1 << PB0;
-			}
-			slave_selected = 0;
-			new_data = 0;
+			timer_triggered = 0;
 		}
-#else
-		if( (in_data & MASTER_MASK) == MASTER_DOSTEP)
-		{
-			step(1);
-			spiX_put(SLAVE_STEP);
-			in_data = 0;
-			PORTB |= 1 << PB0;
-		}
-		else if( (in_data & MASTER_MASK) == MASTER_DOSTEP_REV)
-		{
-			step(-1);
-			spiX_put(SLAVE_STEP);
-			in_data = 0;
-			PORTB |= 1 << PB0;
-		}
-		else if( (in_data & MASTER_MASK) == MASTER_SYNC)
-		{
-			//TODO: send some status here
-			spiX_put(SLAVE_SYNC);
-			in_data = 0;
-			PORTB |= 1 << PB0;
-		}
-#endif
 
-#if (ENABLE_CS == 1)
-		if(spiX_start_transfer())
-#endif
+		if(spiX_status.transferComplete)
 		{
-			spiX_wait();		// wait for transmission to finish
-			in_data = spiX_get();	// and finally put result on PORTB.
-			PORTB &= ~(1 << PB0);
-			new_data = 1;
+			master_cmd = spi_received_data[0] >> 6;
+			if(master_cmd == MasterSYNC)
+			{
+				spiX_put(SlaveSYNC);
+			}
+			else if(master_cmd == MasterSTEP)
+			{
+				PORTB &= ~(1 << PB0);
+				steps_to_do = ((spi_received_data[0] & 0x1f) << 8) | spi_received_data[1];
+				if( (spi_received_data[0] >> 5) & 0x1)
+					dir = 1;
+				else
+					dir = -1;
+				
+				rpm_to_us = RPM_CONST / (uint16_t) spi_received_data[2];
+				if(rpm_to_us < TIMER_INTERVAL_US)
+					rpm_to_us = TIMER_INTERVAL_US;
+				start_timer(rpm_to_us);
+				spiX_put(SlaveSTEP);
+			}
+
+			spiX_status.transferComplete = 0;
+			
 		}
-		
 		
 		
 		

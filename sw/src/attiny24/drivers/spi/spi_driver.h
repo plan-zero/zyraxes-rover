@@ -19,12 +19,32 @@
 #ifndef SPI_DRIVER_H
 #define SPI_DRIVER_H
 
+#define SPI_DATA_SIZE 3
 
-void spiX_initmaster(char spi_mode);
+#define SLAVE_ACK 0xAA
+
+typedef enum {
+    SlaveSYNC = 0xAA,
+    SlaveSTEP = 0x77,
+}SlaveACK;
+
+typedef enum {
+    MasterSYNC = 0x3,
+    MasterSTEP = 0x1,
+    MasterCount
+}MasterCMD;
+
+typedef struct  {
+	unsigned char transferComplete : 1; //!< True when transfer completed.
+	unsigned char writeCollision : 1;   //!< True if put attempted during transfer.
+	unsigned char cs_assert : 1; //!< True if in slaveMode and CS is asserted by master.
+    unsigned char master_cmd : 2;
+}usidriverStatus_t;
+
+extern volatile unsigned  char spi_received_data[SPI_DATA_SIZE];
+extern volatile usidriverStatus_t spiX_status;
+
 void spiX_initslave(char spi_mode);
 char spiX_put(unsigned char val);
-unsigned char spiX_get();
-void spiX_wait();
-unsigned char spiX_start_transfer();
 
 #endif /*SPI_DRIVER_H*/
