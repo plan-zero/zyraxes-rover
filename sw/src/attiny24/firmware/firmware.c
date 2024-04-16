@@ -132,6 +132,7 @@ int main()
 
 		if(timer_triggered)
 		{
+			PORTB &= ~(1 << PB0);
 			if(steps_to_do)
 			{
 				
@@ -146,6 +147,7 @@ int main()
 				PORTB |= (1 << PB0);
 			}
 			timer_triggered = 0;
+			PORTB |= (1 << PB0);
 		}
 
 		if(spiX_status.transferComplete)
@@ -157,7 +159,7 @@ int main()
 			}
 			else if(master_cmd == MasterSTEP)
 			{
-				PORTB &= ~(1 << PB0);
+				
 				steps_to_do = ((spi_received_data[0] & 0x1f) << 8) | spi_received_data[1];
 				if( (spi_received_data[0] >> 5) & 0x1)
 					dir = 1;

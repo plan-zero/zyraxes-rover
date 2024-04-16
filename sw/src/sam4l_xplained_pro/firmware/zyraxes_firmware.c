@@ -176,8 +176,8 @@ int main(void)
 	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
 		MUX_PC01A_SPI_NPCS3);
 
-	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0);
-	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0);
+	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1);
+	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5);
 
 
 	//init pointer to the flash first page
@@ -186,8 +186,8 @@ int main(void)
 	/* Display menu. */
 	display_menu();
 
-	//50us
-	configure_tc(20000);
+	//10ms
+	configure_tc(20);
 
 	uMotorID selected_motor = MOTOR_COUNT;
 	uint8_t selected_dir = MOTOR_FORWARD;

@@ -141,7 +141,7 @@ static inline int _motor_read_raw(uint8_t PCs)
 }
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t motorUsePCs)
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
 {
     static int tryout = 3;
     int sync_ack = 0;
@@ -151,7 +151,6 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t m
     _motors[motorID].motorPCs = motorPCs;
     _motors[motorID].sensorPCs = sensorPCs;
     _motors[motorID].motorID = motorID;
-    _motors[motorID].motorUsePCs = motorUsePCs;
     _motors[motorID].us_per_microstep = 0;
     _motors[motorID].RPM = 0;
 
@@ -177,6 +176,14 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t m
         _motors[motorID].state = STATE_MOTOR_ERROR;
         printf("motor_init: sync error \n\r");
     }
+    else
+    {
+        //get initial senzor data
+        _motors[motorID].init_pos = _motor_read_raw(_motors[motorID].motorPCs = motorPCs);
+        _motors[motorID].init_angle = 0;
+        _motors[motorID].angular_speed = 0;
+        _motors[motorID].rotations = 0;
+    }
 
 }
 
@@ -192,7 +199,7 @@ void motor_microstep(uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
 
 void motor_one_step(uMotorID motorID, uint8_t dir)
 {
-        _motor_micro_step(_motors[motorID].motorPCs, dir, 16, 187);
+        _motor_micro_step(_motors[motorID].motorPCs, dir, 16, 150);
         delay_us(187 * MOTOR_MICROSTEP_WAIT_US);
 }
 
@@ -203,16 +210,16 @@ float motor_read_angle(uMotorID motorID)
         printf("motor_read_angle: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
     }
-    const int avg = 3;
+    const int avg = 1;
     int encoderReading = 0;
 
     for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
         encoderReading += _motor_read_raw(_motors[motorID].sensorPCs);
-        delay_us(10);
     }
 
-    //return encoderReading * (360.0 / 16384.0) / avg;
-    return lookup[motorID][encoderReading / avg];
+    return encoderReading * (360.0 / 4096) / avg;
+    //TODO: fix calibration, until then use direct data
+    //return lookup[motorID][encoderReading / avg];
 
 }
 
@@ -270,6 +277,7 @@ void motor_calibrate(uMotorID motorID) {
         printf("motor_calibrate: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
     }
+    
     static int cpr = CPR;
     static float aps = MOTOR_APS;
     int encoderReading = 0;     //or float?  not sure if we can average for more res?
@@ -295,8 +303,8 @@ void motor_calibrate(uMotorID motorID) {
 
     if ((_motor_read_raw(_motors[motorID].sensorPCs) - encoderReading) < 0)   //check which way motor moves when dir = true
     {
-    puts("Wired backwards \n\r");    // rewiring either phase should fix this.  You may get a false message if you happen to be near the point where the encoder rolls over...
-    return;
+        puts("Wired backwards \n\r");    // rewiring either phase should fix this.  You may get a false message if you happen to be near the point where the encoder rolls over...
+        return;
     }
 
     while (_motors[motorID].stepNumber != 0) {       //go to step zero
@@ -307,14 +315,14 @@ void motor_calibrate(uMotorID motorID) {
     {
         dir = MOTOR_REVERSE;
     }
-    motor_one_step(motorID, dir);
-    delay_ms(100);
+        motor_one_step(motorID, dir);
+        delay_ms(100);
     }
     dir = MOTOR_FORWARD;
     for (int x = 0; x < MOTOR_SPR; x++) {     //step through all full step positions, recording their encoder readings
 
     encoderReading = 0;
-    delay_ms(20);                         //moving too fast may not give accurate readings.  Motor needs time to settle after each step.
+    delay_ms(50);                         //moving too fast may not give accurate readings.  Motor needs time to settle after each step.
     lastencoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
         
     for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
@@ -340,7 +348,15 @@ void motor_calibrate(uMotorID motorID) {
     }
 
     fullStepReadings[x] = encoderReading;
+
+    //static int lines = 0;
+    //debug:
+    //printf("%d, ", fullStepReadings[x]);
+    //lines++;
+    //if (lines % 10 == 0)
+    //    printf("\n\r");
     // SerialUSB.println(fullStepReadings[x], DEC);      //print readings as a sanity check
+    
     if (x % 20 == 0)
     {
         printf("\n\r DBG: %d \n\r", 100*x/MOTOR_SPR);
@@ -349,45 +365,45 @@ void motor_calibrate(uMotorID motorID) {
         printf(".");
     }
 
-    motor_one_step(motorID, dir);
+        motor_one_step(motorID, dir);
     }
         puts("\n\r");
 
 
     for (int i = 0; i < MOTOR_SPR; i++) {
-    ticks = fullStepReadings[mod((i + 1), MOTOR_SPR)] - fullStepReadings[mod((i), MOTOR_SPR)];
-    if (ticks < -CPR_THRESHOLD) {
-        ticks += cpr;
-
-    }
-    else if (ticks > CPR_THRESHOLD) {
-        ticks -= cpr;
-    }
-    // SerialUSB.println(ticks);
-
-    if (ticks > 1) {                                    //note starting point with iStart,jStart
-        for (int j = 0; j < ticks; j++) {
-        stepNo = (mod(fullStepReadings[i] + j, cpr));
-        // SerialUSB.println(stepNo);
-        if (stepNo == 0) {
-            iStart = i;
-            jStart = j;
-        }
+        ticks = fullStepReadings[mod((i + 1), MOTOR_SPR)] - fullStepReadings[mod((i), MOTOR_SPR)];
+        if (ticks < -CPR_THRESHOLD) {
+            ticks += cpr;
 
         }
-    }
+        else if (ticks > CPR_THRESHOLD) {
+            ticks -= cpr;
+        }
+        // SerialUSB.println(ticks);
 
-    if (ticks < 1) {                                    //note starting point with iStart,jStart
-        for (int j = -ticks; j > 0; j--) {
-        stepNo = (mod(fullStepReadings[MOTOR_SPR - 1 - i] + j, cpr));
-        // SerialUSB.println(stepNo);
-        if (stepNo == 0) {
-            iStart = i;
-            jStart = j;
+        if (ticks > 1) {                                    //note starting point with iStart,jStart
+            for (int j = 0; j < ticks; j++) {
+            stepNo = (mod(fullStepReadings[i] + j, cpr));
+            // SerialUSB.println(stepNo);
+            if (stepNo == 0) {
+                iStart = i;
+                jStart = j;
+            }
+
+            }
         }
 
+        if (ticks < 1) {                                    //note starting point with iStart,jStart
+            for (int j = -ticks; j > 0; j--) {
+            stepNo = (mod(fullStepReadings[MOTOR_SPR - 1 - i] + j, cpr));
+            // SerialUSB.println(stepNo);
+            if (stepNo == 0) {
+                iStart = i;
+                jStart = j;
+            }
+
+            }
         }
-    }
 
     }
 
@@ -403,58 +419,58 @@ void motor_calibrate(uMotorID motorID) {
     printf("%x ", page_ptr);
 
     for (int i = iStart; i < (iStart + MOTOR_SPR + 1); i++) {
-    ticks = fullStepReadings[mod((i + 1), MOTOR_SPR)] - fullStepReadings[mod((i), MOTOR_SPR)];
+        ticks = fullStepReadings[mod((i + 1), MOTOR_SPR)] - fullStepReadings[mod((i), MOTOR_SPR)];
 
-    if (ticks < -CPR_THRESHOLD) {           //check if current interval wraps over encoder's zero positon
-        ticks += cpr;
-    }
-    else if (ticks > CPR_THRESHOLD) {
-        ticks -= cpr;
-    }
-    //Here we print an interpolated angle corresponding to each encoder count (in order)
-    if (ticks > 1) {              //if encoder counts were increasing during cal routine...
+        if (ticks < -CPR_THRESHOLD) {           //check if current interval wraps over encoder's zero positon
+            ticks += cpr;
+        }
+        else if (ticks > CPR_THRESHOLD) {
+            ticks -= cpr;
+        }
+        //Here we print an interpolated angle corresponding to each encoder count (in order)
+        if (ticks > 1) {              //if encoder counts were increasing during cal routine...
 
-        if (i == iStart) { //this is an edge case
-        for (int j = jStart; j < ticks; j++) {
-        store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
-        }
-        }
+            if (i == iStart) { //this is an edge case
+                for (int j = jStart; j < ticks; j++) {
+                    store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+                }
+            }
 
-        else if (i == (iStart + MOTOR_SPR)) { //this is an edge case
-        for (int j = 0; j < jStart; j++) {
-        store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
-        }
-        }
-        else {                        //this is the general case
-        for (int j = 0; j < ticks; j++) {
-        store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
-        }
-        }
-    }
-
-    else if (ticks < 1) {             //similar to above... for case when encoder counts were decreasing during cal routine
-        if (i == iStart) {
-        for (int j = - ticks; j > (jStart); j--) {
-            store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
-        }
-        }
-        else if (i == iStart + MOTOR_SPR) {
-        for (int j = jStart; j > 0; j--) {
-            store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
-        }
-        }
-        else {
-        for (int j = - ticks; j > 0; j--) {
-            store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
-        }
+            else if (i == (iStart + MOTOR_SPR)) { //this is an edge case
+                for (int j = 0; j < jStart; j++) {
+                    store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+                }
+            }
+            else {                        //this is the general case
+                for (int j = 0; j < ticks; j++) {
+                    store_lookup(0.001 * mod(1000 * ((aps * i) + ((aps * j ) / (float)(ticks))), 360000.0));
+                }
+            }
         }
 
-    }
+        else if (ticks < 1) {             //similar to above... for case when encoder counts were decreasing during cal routine
+            if (i == iStart) {
+                for (int j = - ticks; j > (jStart); j--) {
+                    store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+                }
+            }
+            else if (i == iStart + MOTOR_SPR) {
+                for (int j = jStart; j > 0; j--) {
+                    store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+                }
+            }
+            else {
+                for (int j = - ticks; j > 0; j--) {
+                    store_lookup(0.001 * mod(1000 * (aps * (i) + (aps * ((ticks + j)) / (float)(ticks))), 360000.0));
+                }
+            }
 
-
+        }
     }
 
     puts("Calibration complete! \n\r");
+    //update initial angle
+    _motors[motorID].init_angle = motor_read_angle(motorID);
     puts("The calibration table has been written to non-volatile Flash memory! \n\r");
     page_number = 0;
 
@@ -478,8 +494,51 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
 
 }
 
+int task_count = 0;
+char str[5];
+float tmp_angle = 0;
 
 void motor_task()
 {
+
+    for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
+    {
+        if(_motors[i].state == STATE_MOTOR_OK)
+        {
+            //read current angle
+            _motors[i].angle = motor_read_angle(i);
+            tmp_angle = (_motors[i].init_angle - _motors[i].angle);
+            if( abs(tmp_angle) > 180.0 )
+            {
+                //wrap arround, taking this into account
+                tmp_angle = 360.0 - abs(tmp_angle);
+                if(_motors[i].dir == MOTOR_FORWARD)
+                    _motors[i].rotations++;
+                else
+                    _motors[i].rotations--;
+            }
+            _motors[i].angular_speed = abs(tmp_angle) / 0.05; //50ms task, deg/second
+            _motors[i].calculated_rpm = _motors[i].angular_speed * 0.1666; //calculate actual RPM
+            _motors[i].init_angle =  _motors[i].angle;
+        }
+    }
+
+    if( (task_count % 20) == 0)
+    {
+        //printout stats for motors
+        for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
+        {
+            if(_motors[i].state == STATE_MOTOR_OK)
+            {
+                snprintf(str, sizeof(str), "%f", _motors[i].angular_speed);
+                printf("ID: %d, as:%s", i, str);
+                snprintf(str, sizeof(str), "%f", _motors[i].calculated_rpm);
+                printf(", rpm:%s", str);
+                printf(", rot:%d \n\r",  _motors[i].rotations);
+            }
+        }
+    }
+
+    task_count++;
 
 }

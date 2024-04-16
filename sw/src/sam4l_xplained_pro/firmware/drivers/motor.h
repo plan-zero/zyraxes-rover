@@ -17,18 +17,25 @@ typedef enum {
 
 typedef struct {
     uint8_t motorID;
-    uint8_t motorUsePCs;
     uint8_t motorPCs;
     uint8_t sensorPCs;
     uint8_t dir;
     sMotorState state;
     uint64_t stepNumber;
     int us_per_microstep;
+    
     uint32_t RPM;
+    uint64_t init_pos;
+    float init_angle;
+    float angle;
+    float angular_speed;
+    float abs_angle;
+    float calculated_rpm;
+    int64_t rotations;
 }sMotorInstance;
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t motorUsePCs);
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs);
 float motor_read_angle(uMotorID motorID);
 int motor_read_position(uMotorID motorID);
 void motor_one_step(uMotorID motorID, uint8_t dir);
