@@ -21,17 +21,17 @@ typedef struct {
     uint8_t sensorPCs;
     uint8_t dir;
     sMotorState state;
-    uint64_t stepNumber;
+    int stepNumber;
     int us_per_microstep;
     
     uint32_t RPM;
-    uint64_t init_pos;
+    int init_pos;
     float init_angle;
     float angle;
     float angular_speed;
     float abs_angle;
     float calculated_rpm;
-    int64_t rotations;
+    int rotations;
 }sMotorInstance;
 
 

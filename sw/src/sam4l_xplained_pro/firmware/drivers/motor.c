@@ -534,7 +534,7 @@ void motor_task()
                 printf("ID: %d, as:%s", i, str);
                 snprintf(str, sizeof(str), "%f", _motors[i].calculated_rpm);
                 printf(", rpm:%s", str);
-                printf(", rot:%d \n\r",  _motors[i].rotations);
+                printf(", rot:%ld \n\r",  _motors[i].rotations);
             }
         }
     }
