@@ -5,7 +5,9 @@
 #include "motor_calibration.h"
 
 
+//this is clockwise 
 #define MOTOR_FORWARD   1
+//this is conterclockwise
 #define MOTOR_REVERSE   0
 
 typedef enum {
@@ -24,18 +26,29 @@ typedef struct {
     int stepNumber;
     int us_per_microstep;
     
+    //user set RPM
     uint32_t RPM;
+    //magnetic sensor init raw value & angle
     int init_pos;
     float init_angle;
+    //magnetic sensor current angle read
     float angle;
+    //current angular speed
     float angular_speed;
-    float abs_angle;
+    //calculated RPM absed on sensor data
     float calculated_rpm;
+    //overall rotations done by motor since start
     int rotations;
+
+    //motor absolute set position and current absolute pos (deg)
+    float angle_set;
+    float angle_absolute_pos;
+    //go to zero position
+    uint8_t go_zero;
 }sMotorInstance;
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs);
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero);
 float motor_read_angle(uMotorID motorID);
 int motor_read_position(uMotorID motorID);
 void motor_one_step(uMotorID motorID, uint8_t dir);
@@ -47,5 +60,6 @@ void motor_printout(uMotorID motorID);
 void motor_task();
 sMotorState motor_get_status(uMotorID motorID);
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM);
+void motor_set_dir(uMotorID motorID, uint8_t dir);
 
 #endif /*MOTOR_H*/

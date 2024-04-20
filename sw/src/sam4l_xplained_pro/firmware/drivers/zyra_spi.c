@@ -144,7 +144,7 @@ uint8_t spi_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last)
 	uint8_t uc_pcs;
 
 	spi_write(SPI_MASTER_BASE, in_data, cs, last);
-	while ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0 && timeout < SPI_TIMEOUT_READ)
+	while ( ((spi_read_status(SPI_MASTER_BASE) & SPI_SR_RDRF) == 0) && (timeout < SPI_TIMEOUT_READ))
 	{
 		delay_us(5);
 		timeout++;

@@ -9,7 +9,20 @@
 #define MOTOR_STEP_CMD  0x40
 #define MOTOR_SYNC_ACK  0xAA
 
-#define BROADCAST_NO_CS 0
+
+const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP_CONFIG);
+
+const float startup_angle[MOTOR_COUNT] = 
+{
+    0.0,
+    340.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0
+};
 
 const float __attribute__((__aligned__(512))) lookup[MOTOR_COUNT][MAGNETIC_LUT_SIZE] = {
 //Put lookup table here!
@@ -141,7 +154,7 @@ static inline int _motor_read_raw(uint8_t PCs)
 }
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero)
 {
     static int tryout = 3;
     int sync_ack = 0;
@@ -178,11 +191,60 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs)
     }
     else
     {
+        char str[7];
         //get initial senzor data
         _motors[motorID].init_pos = _motor_read_raw(_motors[motorID].motorPCs = motorPCs);
-        _motors[motorID].init_angle = 0;
+        //get few reads to make sure there is no flush data in SPI
+        for(int i = 0; i < 2; i++) {
+            _motors[motorID].init_angle = motor_read_angle(motorID);
+            snprintf(str, sizeof(str), "%f", _motors[motorID].init_angle);
+            printf("init_angle: %s, PCs %d \n\r", str, _motors[motorID].motorPCs);
+        }
         _motors[motorID].angular_speed = 0;
         _motors[motorID].rotations = 0;
+        //set the initial angle
+        _motors[motorID].angle_set = startup_angle[motorID];
+        _motors[motorID].go_zero = go_zero;
+
+        if(go_zero)
+        {
+            float delta_angle = _motors[motorID].angle_set - _motors[motorID].init_angle;
+            unsigned int steps_to_zero = 0;
+
+
+
+
+            if(abs(delta_angle) <= 180.0)
+            {
+                steps_to_zero = (unsigned int)(abs(delta_angle) / angle_step_conv);
+                if(delta_angle <= 0){
+                    _motor_micro_step(_motors[motorID].motorPCs, MOTOR_FORWARD, steps_to_zero, 50);
+                    printf("1\n\r");
+                }
+                else
+                {
+                     _motor_micro_step(_motors[motorID].motorPCs, MOTOR_REVERSE, steps_to_zero, 50);
+                     printf("2\n\r");
+                }
+            }
+            else
+            {
+                steps_to_zero = (unsigned int)( (360.0 - abs(delta_angle)) / angle_step_conv);
+                if(delta_angle <= 0)
+                {
+                    _motor_micro_step(_motors[motorID].motorPCs, MOTOR_REVERSE, steps_to_zero, 50);
+                    printf("3\n\r");
+                }
+                else
+                {
+                     _motor_micro_step(_motors[motorID].motorPCs, MOTOR_FORWARD, steps_to_zero, 50);
+                    printf("4\n\r");
+                }
+            }
+            //debug
+            snprintf(str, sizeof(str), "%f", delta_angle);
+            printf("delta: %s, steps %d \n\r", str, steps_to_zero);
+        }
     }
 
 }
@@ -480,6 +542,13 @@ void motor_calibrate(uMotorID motorID) {
 
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
 {
+
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_calibrate: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
+
     //calculate desired microstep delay
     int microstep_wait = 0;
 
@@ -491,6 +560,18 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
     _motors[motorID].us_per_microstep = microstep_wait;
 
     _motor_micro_step( _motors[motorID].motorPCs, _motors[motorID].dir, 0x1fff, RPM);
+
+}
+
+void motor_set_dir(uMotorID motorID, uint8_t dir)
+{
+    if(STATE_MOTOR_OK != _motors[motorID].state)
+    {   
+        printf("motor_calibrate: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        return;
+    }
+
+    _motors[motorID].dir = dir;
 
 }
 

@@ -176,8 +176,13 @@ int main(void)
 	ioport_set_pin_peripheral_mode(PIN_PC01A_SPI_NPCS3,
 		MUX_PC01A_SPI_NPCS3);
 
-	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1);
-	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5);
+	//wait for motors driver to start
+	delay_ms(2000);
+	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0);
+	motor_init(MOTOR_1, SPI_CHIP_PCS_2, SPI_CHIP_PCS_3, 1);
+	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0);
+	//wait to go to zero pozition
+	delay_ms(1000);
 
 
 	//init pointer to the flash first page
@@ -252,11 +257,13 @@ int main(void)
 				{
 					puts("Motor reverse! \n\r");
 					selected_dir = MOTOR_REVERSE;
+					motor_set_dir(selected_motor, selected_dir);
 				}
 				else
 				{
 					puts("Motor forward! \n\r");
 					selected_dir = MOTOR_FORWARD;
+					motor_set_dir(selected_motor, selected_dir);
 				}
 				break;
 
