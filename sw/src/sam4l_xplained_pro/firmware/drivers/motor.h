@@ -45,10 +45,12 @@ typedef struct {
     float angle_absolute_pos;
     //go to zero position
     uint8_t go_zero;
+    //gearbox value
+    float gearbox;
 }sMotorInstance;
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero);
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox);
 float motor_read_angle(uMotorID motorID);
 int motor_read_position(uMotorID motorID);
 void motor_one_step(uMotorID motorID, uint8_t dir);
@@ -61,5 +63,6 @@ void motor_task();
 sMotorState motor_get_status(uMotorID motorID);
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM);
 void motor_set_dir(uMotorID motorID, uint8_t dir);
+float motor_get_abs(uMotorID motorID);
 
 #endif /*MOTOR_H*/

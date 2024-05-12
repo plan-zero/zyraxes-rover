@@ -68,6 +68,10 @@ static void display_menu(void)
 		 "  o: Decrease RPM \n\r"
 		 "  b: Break all motors \n\r"
 		 "  k: Dev SPI tryout \n\r"
+		 "  x: Move forward test \n\r"
+		 "  v: Move backward test \n\r"
+		 "  j: Turn Left test \n\r"
+		 "  l: Turn Right test \n\r"
 		 "  h: Display this menu again\n\r\r");
 
 }
@@ -178,9 +182,14 @@ int main(void)
 
 	//wait for motors driver to start
 	delay_ms(2000);
-	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0);
-	motor_init(MOTOR_1, SPI_CHIP_PCS_2, SPI_CHIP_PCS_3, 1);
-	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0);
+	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0, 1);
+	motor_init(MOTOR_1, SPI_CHIP_PCS_2, SPI_CHIP_PCS_3, 0, 1);
+	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0, 1);
+	motor_init(MOTOR_3, SPI_CHIP_PCS_6, SPI_CHIP_PCS_7, 0, 1);
+	motor_init(MOTOR_4, SPI_CHIP_PCS_8, SPI_CHIP_PCS_9, 0, 1);
+	motor_init(MOTOR_5, SPI_CHIP_PCS_10, SPI_CHIP_PCS_11, 0, 1);
+	motor_init(MOTOR_6, SPI_CHIP_PCS_12, SPI_CHIP_PCS_13, 0, 1);
+	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 1);
 	//wait to go to zero pozition
 	delay_ms(1000);
 
@@ -204,6 +213,7 @@ int main(void)
 
 	uint8_t spi_data1 = 0, spi_data2 = 0, spi_data3 = 0;
 	int toggle = 0;
+	int process_extended = 0;
 	while (1) {
 		//scanf("%c", (char *)&uc_key);
 
@@ -213,6 +223,66 @@ int main(void)
 			usart_getchar(CONF_UART, &uc_key);
 			//printf("recieved char %x \n\r", uc_key);
 			switch (uc_key) {
+			case 0x1b:
+				process_extended = 1;
+			break;
+
+			case 0x44: //left
+				if(process_extended)
+				{
+					//printf("Left \n\r");
+					motor_microstep(MOTOR_0, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					motor_microstep(MOTOR_2, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+
+					motor_microstep(MOTOR_4, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					motor_microstep(MOTOR_6, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					delay_ms(160);
+					process_extended = 0;
+				}
+			break;
+
+			case 0x41: //forward
+				if(process_extended)
+				{
+					//printf("Forward \n\r");
+					process_extended = 0;
+
+					motor_microstep(MOTOR_5, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					motor_microstep(MOTOR_1, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+
+					motor_microstep(MOTOR_7, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					motor_microstep(MOTOR_3, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					delay_ms(320);
+				}
+			break;
+
+			case 0x42: //backward
+				if(process_extended)
+				{
+					//printf("Backward \n\r");
+					motor_microstep(MOTOR_5, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					motor_microstep(MOTOR_1, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+
+					motor_microstep(MOTOR_7, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					motor_microstep(MOTOR_3, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					delay_ms(320);
+					process_extended = 0;
+				}
+			break;
+
+			case 0x43: //right
+				if(process_extended)
+				{
+					//printf("Right \n\r");
+					motor_microstep(MOTOR_0, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					motor_microstep(MOTOR_2, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+
+					motor_microstep(MOTOR_4, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					motor_microstep(MOTOR_6, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					delay_ms(160);
+					process_extended = 0;
+				}
+			break;
 			case '0':
 			case '1':
 			case '2':
@@ -247,7 +317,7 @@ int main(void)
 				printf("Do 360 rotation test on motor: %d  \n\r", selected_motor);
 				if(selected_motor < MOTOR_COUNT)
 				{
-					motor_microstep(selected_motor, selected_dir,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 180);
+					motor_microstep(selected_motor, selected_dir,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 					delay_us(motor_speed);
 				}
 				break;
@@ -283,7 +353,10 @@ int main(void)
 					float angle = motor_read_angle(selected_motor);
 					char str[8];
 					snprintf(str, sizeof(str), "%f", angle);
-					printf(" %s \n\r",str);
+					printf("Angle %s \n\r",str);
+					angle = motor_get_abs(selected_motor);
+					snprintf(str, sizeof(str), "%f", angle);
+					printf("Abs %s \n\r",str);
 					int raw = motor_read_position(selected_motor);
 					printf("Raw: %d \n\r", raw);
 				}
@@ -349,6 +422,19 @@ int main(void)
 				}
 				toggle ^= 1;
 			break;
+
+			case 'x':
+
+				break;
+			case 'v':
+
+				break;
+			case 'l':
+
+				break;
+			case 'j':
+
+				break;
 			default:
 				break;
 			}

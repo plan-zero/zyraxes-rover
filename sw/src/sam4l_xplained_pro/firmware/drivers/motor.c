@@ -15,7 +15,7 @@ const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP
 const float startup_angle[MOTOR_COUNT] = 
 {
     0.0,
-    340.0,
+    330,
     0.0,
     0.0,
     0.0,
@@ -154,7 +154,7 @@ static inline int _motor_read_raw(uint8_t PCs)
 }
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero)
+void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox)
 {
     static int tryout = 3;
     int sync_ack = 0;
@@ -166,6 +166,7 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
     _motors[motorID].motorID = motorID;
     _motors[motorID].us_per_microstep = 0;
     _motors[motorID].RPM = 0;
+    _motors[motorID].gearbox = gearbox;
 
     printf("motor_init: sync with motor driver, sending... \n\r");
 
@@ -212,8 +213,6 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
             unsigned int steps_to_zero = 0;
 
 
-
-
             if(abs(delta_angle) <= 180.0)
             {
                 steps_to_zero = (unsigned int)(abs(delta_angle) / angle_step_conv);
@@ -244,9 +243,26 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
             //debug
             snprintf(str, sizeof(str), "%f", delta_angle);
             printf("delta: %s, steps %d \n\r", str, steps_to_zero);
+
+            _motors[motorID].init_angle = motor_read_angle(motorID);
+            _motors[motorID].angle = _motors[motorID].init_angle;
+            //take this as zero pos
+            _motors[motorID].angle_absolute_pos = 0;
         }
     }
 
+}
+
+float motor_get_abs(uMotorID motorID)
+{
+    //read angle from sensor
+    float sign = -1.0;
+    if(_motors[motorID].dir)
+    {
+        sign = 1.0;   
+    }
+    float abs_pos = (_motors[motorID].init_angle + ( (float)_motors[motorID].rotations * 360.0) + ( sign * _motors[motorID].angle_set) ) / _motors[motorID].gearbox; 
+    return abs_pos;
 }
 
 sMotorState motor_get_status(uMotorID motorID)
@@ -256,11 +272,13 @@ sMotorState motor_get_status(uMotorID motorID)
 
 void motor_microstep(uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
 {
+    _motors[motorID].dir = dir;
     _motor_micro_step(_motors[motorID].motorPCs, dir, steps, rpm);
 }
 
 void motor_one_step(uMotorID motorID, uint8_t dir)
 {
+        _motors[motorID].dir = dir;
         _motor_micro_step(_motors[motorID].motorPCs, dir, 16, 150);
         delay_us(187 * MOTOR_MICROSTEP_WAIT_US);
 }
