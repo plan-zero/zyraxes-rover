@@ -68,10 +68,7 @@ static void display_menu(void)
 		 "  o: Decrease RPM \n\r"
 		 "  b: Break all motors \n\r"
 		 "  k: Dev SPI tryout \n\r"
-		 "  x: Move forward test \n\r"
-		 "  v: Move backward test \n\r"
-		 "  j: Turn Left test \n\r"
-		 "  l: Turn Right test \n\r"
+		 "  x: Start commands\n\r"
 		 "  h: Display this menu again\n\r\r");
 
 }
@@ -192,6 +189,14 @@ int main(void)
 	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 1);
 	//wait to go to zero pozition
 	delay_ms(1000);
+	motor_set_power(MOTOR_0, 0.8);
+	motor_set_power(MOTOR_1, 0.8);
+	motor_set_power(MOTOR_2, 0.8);
+	motor_set_power(MOTOR_3, 0.8);
+	motor_set_power(MOTOR_4, 0.8);
+	motor_set_power(MOTOR_5, 0.8);
+	motor_set_power(MOTOR_6, 0.8);
+	motor_set_power(MOTOR_7, 0.8);
 
 
 	//init pointer to the flash first page
@@ -214,6 +219,19 @@ int main(void)
 	uint8_t spi_data1 = 0, spi_data2 = 0, spi_data3 = 0;
 	int toggle = 0;
 	int process_extended = 0;
+
+	int8_t x_val = 0;
+	int8_t y_val = 0;
+	int command_mode = 0;
+	uint8_t js_rpm = 0;
+	int js_timeout = 0;
+	int left = 0;
+	int right = 0;
+
+	float angle_m0 = 0, angle_m1 = 0, angle_m2 = 0, angle_m3 = 0;
+	float fangle_m0 = 0, fangle_m1 = 0, fangle_m2 = 0, fangle_m3 = 0;
+
+
 	while (1) {
 		//scanf("%c", (char *)&uc_key);
 
@@ -223,20 +241,64 @@ int main(void)
 			usart_getchar(CONF_UART, &uc_key);
 			//printf("recieved char %x \n\r", uc_key);
 			switch (uc_key) {
+
+			case 'x':
+				command_mode = 1;
+			break;					
 			case 0x1b:
 				process_extended = 1;
 			break;
-
 			case 0x44: //left
 				if(process_extended)
 				{
-					//printf("Left \n\r");
-					motor_microstep(MOTOR_0, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-					motor_microstep(MOTOR_2, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					if(left >= 0)
+					{
+						left--;
+						right++;
+						//printf("Left \n\r");
+						angle_m0 = motor_read_angle(MOTOR_0);
+						angle_m0 = motor_read_angle(MOTOR_2);
+						angle_m0 = motor_read_angle(MOTOR_4);
+						angle_m0 = motor_read_angle(MOTOR_6);
 
-					motor_microstep(MOTOR_4, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-					motor_microstep(MOTOR_6, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-					delay_ms(160);
+						motor_microstep(MOTOR_0, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_2, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+
+						motor_microstep(MOTOR_4, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_6, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+
+						fangle_m0 = motor_read_angle(MOTOR_0);
+						fangle_m0 = motor_read_angle(MOTOR_2);
+						fangle_m0 = motor_read_angle(MOTOR_4);
+						fangle_m0 = motor_read_angle(MOTOR_6);
+
+						delay_ms(10);
+
+						if(abs(fangle_m0 - angle_m0) < 0.1)
+						{
+							motor_microstep(MOTOR_0, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("1\n\r");
+
+						}
+						if(abs(fangle_m1 - angle_m1) < 0.1)
+						{
+							motor_microstep(MOTOR_2, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("2\n\r");
+						}
+						if(abs(fangle_m2 - angle_m2) < 0.1)
+						{
+							motor_microstep(MOTOR_4, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("3\n\r");
+						}
+						if(abs(fangle_m3 - angle_m3) < 0.1)
+						{
+							motor_microstep(MOTOR_6, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("4\n\r");
+						}
+
+
+						delay_ms(150);
+					}
 					process_extended = 0;
 				}
 			break;
@@ -273,13 +335,53 @@ int main(void)
 			case 0x43: //right
 				if(process_extended)
 				{
-					//printf("Right \n\r");
-					motor_microstep(MOTOR_0, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-					motor_microstep(MOTOR_2, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+					if(right >= 0)
+					{
+						right--;
+						left++;
+						
+						angle_m0 = motor_read_angle(MOTOR_0);
+						angle_m0 = motor_read_angle(MOTOR_2);
+						angle_m0 = motor_read_angle(MOTOR_4);
+						angle_m0 = motor_read_angle(MOTOR_6);
+						//printf("Right \n\r");
+						motor_microstep(MOTOR_0, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_2, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_4, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_6, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						fangle_m0 = motor_read_angle(MOTOR_0);
+						fangle_m0 = motor_read_angle(MOTOR_2);
+						fangle_m0 = motor_read_angle(MOTOR_4);
+						fangle_m0 = motor_read_angle(MOTOR_6);
 
-					motor_microstep(MOTOR_4, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-					motor_microstep(MOTOR_6, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-					delay_ms(160);
+						delay_ms(10);
+
+						if(abs(fangle_m0 - angle_m0) < 0.1)
+						{
+							motor_microstep(MOTOR_0, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("1\n\r");
+
+						}
+						if(abs(fangle_m1 - angle_m1) < 0.1)
+						{
+							motor_microstep(MOTOR_2, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("2\n\r");
+						}
+						if(abs(fangle_m2 - angle_m2) < 0.1)
+						{
+							motor_microstep(MOTOR_4, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("3\n\r");
+						}
+						if(abs(fangle_m3 - angle_m3) < 0.1)
+						{
+							motor_microstep(MOTOR_6, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+							printf("4\n\r");
+						}
+
+						delay_ms(150);
+					}
+
+					
 					process_extended = 0;
 				}
 			break;
@@ -423,18 +525,6 @@ int main(void)
 				toggle ^= 1;
 			break;
 
-			case 'x':
-
-				break;
-			case 'v':
-
-				break;
-			case 'l':
-
-				break;
-			case 'j':
-
-				break;
 			default:
 				break;
 			}
@@ -445,6 +535,98 @@ int main(void)
 			motor_task();
 			do_motor_task = 0;
 			ioport_set_pin_level(PIN_PC08, IOPORT_PIN_LEVEL_HIGH);
+		}
+
+		if(command_mode)
+		{
+
+			while(command_mode)
+			{
+				//1s
+				if(js_timeout > 10000)
+				{
+					motor_set_rpm(MOTOR_5, 0, 0);
+					motor_set_rpm(MOTOR_1, 0, 0);
+
+					motor_set_rpm(MOTOR_7, 0, 0);
+					motor_set_rpm(MOTOR_3, 0, 0);
+
+					
+				}
+				
+					
+
+				if(usart_is_rx_ready(CONF_UART))
+				{
+					usart_getchar(CONF_UART, &uc_key);
+					switch (uc_key) {
+						case '(':
+							//wait to get all data
+							while(!usart_is_rx_ready(CONF_UART));
+							usart_getchar(CONF_UART, &uc_key);
+							x_val = (int8_t)uc_key;
+							while(!usart_is_rx_ready(CONF_UART));
+							usart_getchar(CONF_UART, &uc_key);
+							y_val = (int8_t)uc_key;
+							while(!usart_is_rx_ready(CONF_UART));
+							usart_getchar(CONF_UART, &uc_key);
+							if(uc_key == ')')
+							{
+								//command done, process data
+								printf("Got x=%d, y=%d \n\r", x_val, y_val);
+							}
+							//set RPM on motors here:
+							if(y_val < 0)
+							{
+								//printf("Forward \n\r");
+								js_rpm = abs(y_val);
+
+								motor_set_rpm(MOTOR_5, 1, js_rpm);
+								motor_set_rpm(MOTOR_1, 1, js_rpm);
+
+								motor_set_rpm(MOTOR_7, 0, js_rpm);
+								motor_set_rpm(MOTOR_3, 0, js_rpm);
+								//delay_ms(100);
+							}
+							else
+							{
+								//printf("Forward \n\r");
+								js_rpm = abs(y_val);
+
+								motor_set_rpm(MOTOR_5, 0, js_rpm);
+								motor_set_rpm(MOTOR_1, 0, js_rpm);
+
+								motor_set_rpm(MOTOR_7, 1, js_rpm);
+								motor_set_rpm(MOTOR_3, 1, js_rpm);
+								//delay_ms(100);
+
+							}
+
+
+							js_timeout = 0;
+						break;
+						case 'e':
+							scanf("%c", (char *)&uc_key);
+							if(uc_key == 's')
+							{
+								scanf("%c", (char *)&uc_key);
+								if(uc_key = 's')
+									command_mode = 0;
+							}
+							
+						break;
+
+						default:
+						break;
+
+					}
+
+				}
+
+				delay_us(100);
+				js_timeout++;
+
+			}
 		}
 
 	}
