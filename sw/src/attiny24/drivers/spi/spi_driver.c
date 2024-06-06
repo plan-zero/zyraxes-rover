@@ -143,6 +143,11 @@ ISR (USI_OVF_vect)
 	USIDR = spi_ack_data[data_counter];
 	data_counter++;
 
+	if(data_counter == SPI_DATA_CHECKSUM_POS)
+	{
+		spiX_status.doChecksum = 1;
+	}
+
 	if(data_counter >= SPI_DATA_SIZE)
 	{
 		data_counter = 0;
@@ -189,6 +194,7 @@ void spiX_initslave( char spi_mode )
 	spi_received_data[0] = 0;
 	spi_received_data[1] = 0;
 	spi_received_data[2] = 0;
+	spi_received_data[3] = 0;
 	data_counter = 0;
 }
 
@@ -220,9 +226,9 @@ char spiX_put( unsigned char val )
 
 	// Put data in USI data register.
 	spi_ack_data[0] = SLAVE_ACK;
-	spi_ack_data[1] = val;
-
-
+	spi_ack_data[1] = 0;
+	spi_ack_data[2] = 0;
+	spi_ack_data[3] = val;
 	
 	return 0;
 }

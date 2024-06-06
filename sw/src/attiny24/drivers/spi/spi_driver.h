@@ -19,23 +19,28 @@
 #ifndef SPI_DRIVER_H
 #define SPI_DRIVER_H
 
-#define SPI_DATA_SIZE 3
+#define SPI_DATA_SIZE 5
+#define SPI_DATA_CHECKSUM_POS 3
 
 #define SLAVE_ACK 0xAA
 
 typedef enum {
     SlaveSYNC = 0xAA,
     SlaveSTEP = 0x77,
+    SlaveSETUP = 0x78,
+    SlaveERROR = 0x55
 }SlaveACK;
 
 typedef enum {
     MasterSYNC = 0x3,
+    MasterSETUP = 0x2,
     MasterSTEP = 0x1,
     MasterCount
 }MasterCMD;
 
 typedef struct  {
 	unsigned char transferComplete : 1; //!< True when transfer completed.
+    unsigned char doChecksum : 1;
 	unsigned char writeCollision : 1;   //!< True if put attempted during transfer.
 	unsigned char cs_assert : 1; //!< True if in slaveMode and CS is asserted by master.
     unsigned char master_cmd : 2;

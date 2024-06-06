@@ -8,6 +8,7 @@
 #include <util/delay.h>
 
 
+#define FIRMWARE_VERSION 0x10
 
 #define SPIMODE 0	// Sample on leading _rising_ edge, setup on trailing _falling_ edge.
 
@@ -21,7 +22,16 @@
 
 #define INPORT PORTA
 
-#define EFFORT 37
+
+//const float iMAX = 1.0;
+//const float rSense = 0.150;
+//volatile int uMAX = (255/3.3)*(iMAX*10*rSense);
+
+//this if for 1A
+#define EFFORT_DEFAULT 37
+#define EFFORT_MAX	   115
+
+uint8_t EFFORT = EFFORT_DEFAULT;
 
 
 static inline void step(int8_t dir)
@@ -126,6 +136,10 @@ int main()
 	int8_t dir = 0;
 	uint8_t master_cmd = 0;
 	uint16_t rpm_to_us = 0;
+	uint8_t effort_to_set = 0;
+	uint8_t checksum = 0;
+	uint8_t calculated_checksum = 0;
+
 	spiX_put(SlaveSYNC);
 
 	do {
@@ -135,8 +149,9 @@ int main()
 			PORTB &= ~(1 << PB0);
 			if(steps_to_do)
 			{
-				
+				cli();
 				step(dir);
+				sei();
 				//if this is free running
 				if(steps_to_do != 0x1fff)
 					steps_to_do--;
@@ -150,30 +165,68 @@ int main()
 			PORTB |= (1 << PB0);
 		}
 
+		if(spiX_status.doChecksum)
+		{
+			checksum = spi_received_data[3];
+			master_cmd = spi_received_data[0] >> 6;
+			calculated_checksum = spi_received_data[0] + spi_received_data[1] + spi_received_data[2];
+			if(checksum != calculated_checksum)
+			{
+				spiX_put(SlaveERROR);
+			}
+			else
+			{
+				if(master_cmd == MasterSYNC)
+				{
+					spiX_put(SlaveSYNC);
+				}
+				else if (master_cmd == MasterSTEP)
+				{
+					spiX_put(SlaveSTEP);
+				}
+				else if (master_cmd == MasterSETUP)
+				{
+					spiX_put(SlaveSETUP);
+				}
+			}
+			spiX_status.doChecksum = 0;
+		}
+
 		if(spiX_status.transferComplete)
 		{
+
 			master_cmd = spi_received_data[0] >> 6;
-			if(master_cmd == MasterSYNC)
+
+			if(checksum == calculated_checksum)
 			{
-				spiX_put(SlaveSYNC);
-			}
-			else if(master_cmd == MasterSTEP)
-			{
-				
-				steps_to_do = ((spi_received_data[0] & 0x1f) << 8) | spi_received_data[1];
-				if( (spi_received_data[0] >> 5) & 0x1)
-					dir = 1;
-				else
-					dir = -1;
-				
-				rpm_to_us = RPM_CONST / (uint16_t) spi_received_data[2];
-				if(rpm_to_us < TIMER_INTERVAL_US)
-					rpm_to_us = TIMER_INTERVAL_US;
-				start_timer(rpm_to_us);
-				spiX_put(SlaveSTEP);
+
+				if(master_cmd == MasterSTEP)
+				{
+					
+					steps_to_do = ((spi_received_data[0] & 0x1f) << 8) | spi_received_data[1];
+					if( (spi_received_data[0] >> 5) & 0x1)
+						dir = 1;
+					else
+						dir = -1;
+					
+					rpm_to_us = RPM_CONST / (uint16_t) spi_received_data[2];
+					if(rpm_to_us < TIMER_INTERVAL_US)
+						rpm_to_us = TIMER_INTERVAL_US;
+					start_timer(rpm_to_us);
+					
+				}
+				else if(master_cmd == MasterSETUP)
+				{
+					effort_to_set = (uint8_t)spi_received_data[1];
+					if(effort_to_set > EFFORT_MAX)
+						effort_to_set = EFFORT_MAX;
+					EFFORT = effort_to_set;
+				}
 			}
 
 			spiX_status.transferComplete = 0;
+			checksum = 0;
+			calculated_checksum = 0;
 			
 		}
 		
