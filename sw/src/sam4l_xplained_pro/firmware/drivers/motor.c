@@ -116,16 +116,52 @@ static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
 
 	uint8_t response = 0;
     uint8_t select_slave = 0;
+    uint8_t in_data[4];
+    uint8_t data[4];
+    int tryout = 5;
 
-    spi_sync_transfer(MOTOR_SYNC_CMD, PCs, 1);
-	response = spi_sync_transfer(MOTOR_SYNC_CMD, PCs, 1);
-    spi_sync_transfer(0xFF, PCs, 1);
-    spi_sync_transfer(0xFF, PCs, 1);
-    spi_sync_transfer(0xFF, PCs, 1);
+    data[0] = MOTOR_SYNC_CMD;
+    data[1] = 0;
+    data[2] = 0;
+    //calculate checksum
+    data[3] = data[0] + data[1] + data[2];
 
-	printf("motor_sync_driver: send 0x%x response: 0x%x\n\r", MOTOR_SYNC_CMD, response);
+    spi_sync_transfer(data[0], PCs, 1);
+	in_data[0] = spi_sync_transfer(data[1], PCs, 1);
+    in_data[1] = spi_sync_transfer(data[2], PCs, 1);
+    in_data[2] = spi_sync_transfer(data[3], PCs, 1);
+    in_data[3] = spi_sync_transfer(0xFF, PCs, 1);
 
-    return response;
+    printf("Ret: %x%x%x%x \n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
+
+    if(in_data[3] != 0xAA)
+    {
+        while(tryout--)
+        {
+            printf("retry cmd \n\r");
+
+            spi_sync_transfer(data[0], PCs, 1);
+            in_data[0] = spi_sync_transfer(data[1], PCs, 1);
+            in_data[1] = spi_sync_transfer(data[2], PCs, 1);
+            in_data[2] = spi_sync_transfer(data[3], PCs, 1);
+            in_data[3] = spi_sync_transfer(0xFF, PCs, 1);
+
+            if(in_data[3] == 0xAA)
+            {
+                tryout = 0;
+                break;
+            }
+        }
+
+        if(in_data[3] != 0xAA)
+        {
+            printf("_motor_sync: ID: %d failed\n\r", motorID);
+            return 1;
+        }
+
+    }
+
+    return 0;
 }
 
 static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t steps, uint8_t rpm)
@@ -195,8 +231,6 @@ static inline int _motor_read_raw(uint8_t PCs)
 
 void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox)
 {
-    static int tryout = 3;
-    int sync_ack = 0;
     printf("motor_init: Initialize motor ID=%d, PCs selected driver %d senzor %d... \n\r", motorID, motorPCs, sensorPCs);
 
     _motors[motorID].state = STATE_MOTOR_UNKNOWN;
@@ -209,28 +243,15 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
 
     printf("motor_init: sync with motor driver, sending... \n\r");
 
-    tryout = 3;
-    while(tryout)
-    {
-        sync_ack = _motor_sync(motorID, _motors[motorID].motorPCs);
-        //wait for atiny24 to startup, should take at least 64ms
-        delay_ms(100);
-        if(sync_ack == MOTOR_SYNC_ACK)
-        {
-            printf("motor_init: sync complete \n\r");
-            _motors[motorID].state = STATE_MOTOR_OK;
-            break;
-        }
-        tryout--;
-    }
 
-    if(sync_ack != MOTOR_SYNC_ACK)
+    if(_motor_sync(motorID, _motors[motorID].motorPCs))
     {
         _motors[motorID].state = STATE_MOTOR_ERROR;
         printf("motor_init: sync error \n\r");
     }
     else
     {
+        _motors[motorID].state = STATE_MOTOR_OK;
         char str[7];
         //get initial senzor data
         _motors[motorID].init_pos = _motor_read_raw(_motors[motorID].motorPCs = motorPCs);
