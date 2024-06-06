@@ -17,10 +17,10 @@
 #define SPI_CLK_PHASE 1
 
 /* Delay before SPCK. */
-#define SPI_DLYBS 200
+#define SPI_DLYBS 220
 
 /* Delay between consecutive transfers. */
-#define SPI_DLYBCT 25
+#define SPI_DLYBCT 40
 
 
 /* Chip select. */
@@ -151,7 +151,7 @@ uint8_t spi_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last)
 	}
 	if(timeout >= SPI_TIMEOUT_READ)
 	{
-		printf("Timeout error: 0x%x", cs);
+		printf("Timeout error: 0x%x \n\r", cs);
 		return -1;
 	}
 	spi_read(SPI_MASTER_BASE, &out_data, &uc_pcs);
