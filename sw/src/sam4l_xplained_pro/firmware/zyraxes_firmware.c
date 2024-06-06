@@ -189,13 +189,13 @@ int main(void)
 	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 1);
 	//wait to go to zero pozition
 	delay_ms(1000);
-	motor_set_power(MOTOR_0, 0.8);
+	motor_set_power(MOTOR_0, 0.9);
 	motor_set_power(MOTOR_1, 0.8);
-	motor_set_power(MOTOR_2, 0.8);
+	motor_set_power(MOTOR_2, 0.9);
 	motor_set_power(MOTOR_3, 0.8);
-	motor_set_power(MOTOR_4, 0.8);
+	motor_set_power(MOTOR_4, 0.9);
 	motor_set_power(MOTOR_5, 0.8);
-	motor_set_power(MOTOR_6, 0.8);
+	motor_set_power(MOTOR_6, 0.9);
 	motor_set_power(MOTOR_7, 0.8);
 
 
@@ -251,51 +251,23 @@ int main(void)
 			case 0x44: //left
 				if(process_extended)
 				{
-					if(left >= 0)
+					if(left >= -3)
 					{
 						left--;
 						right++;
 						//printf("Left \n\r");
-						angle_m0 = motor_read_angle(MOTOR_0);
-						angle_m0 = motor_read_angle(MOTOR_2);
-						angle_m0 = motor_read_angle(MOTOR_4);
-						angle_m0 = motor_read_angle(MOTOR_6);
 
-						motor_microstep(MOTOR_0, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_2, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_0, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_0, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_2, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_2, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 
-						motor_microstep(MOTOR_4, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_6, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_4, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_4, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_6, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_6, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 
-						fangle_m0 = motor_read_angle(MOTOR_0);
-						fangle_m0 = motor_read_angle(MOTOR_2);
-						fangle_m0 = motor_read_angle(MOTOR_4);
-						fangle_m0 = motor_read_angle(MOTOR_6);
-
-						delay_ms(10);
-
-						if(abs(fangle_m0 - angle_m0) < 0.1)
-						{
-							motor_microstep(MOTOR_0, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("1\n\r");
-
-						}
-						if(abs(fangle_m1 - angle_m1) < 0.1)
-						{
-							motor_microstep(MOTOR_2, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("2\n\r");
-						}
-						if(abs(fangle_m2 - angle_m2) < 0.1)
-						{
-							motor_microstep(MOTOR_4, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("3\n\r");
-						}
-						if(abs(fangle_m3 - angle_m3) < 0.1)
-						{
-							motor_microstep(MOTOR_6, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("4\n\r");
-						}
-
+						
 
 						delay_ms(150);
 					}
@@ -310,10 +282,14 @@ int main(void)
 					process_extended = 0;
 
 					motor_microstep(MOTOR_5, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_5, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 					motor_microstep(MOTOR_1, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_1, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 
 					motor_microstep(MOTOR_7, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_7, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 					motor_microstep(MOTOR_3, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_3, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 					delay_ms(320);
 				}
 			break;
@@ -323,10 +299,14 @@ int main(void)
 				{
 					//printf("Backward \n\r");
 					motor_microstep(MOTOR_5, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_5, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 					motor_microstep(MOTOR_1, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_1, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 
 					motor_microstep(MOTOR_7, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_7, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 					motor_microstep(MOTOR_3, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//motor_microstep(MOTOR_3, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
 					delay_ms(320);
 					process_extended = 0;
 				}
@@ -335,48 +315,22 @@ int main(void)
 			case 0x43: //right
 				if(process_extended)
 				{
-					if(right >= 0)
+					if(right >= -3)
 					{
 						right--;
 						left++;
-						
-						angle_m0 = motor_read_angle(MOTOR_0);
-						angle_m0 = motor_read_angle(MOTOR_2);
-						angle_m0 = motor_read_angle(MOTOR_4);
-						angle_m0 = motor_read_angle(MOTOR_6);
+
+
 						//printf("Right \n\r");
-						motor_microstep(MOTOR_0, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_2, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_4, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_6, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-						fangle_m0 = motor_read_angle(MOTOR_0);
-						fangle_m0 = motor_read_angle(MOTOR_2);
-						fangle_m0 = motor_read_angle(MOTOR_4);
-						fangle_m0 = motor_read_angle(MOTOR_6);
+						motor_microstep(MOTOR_0, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_0, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_2, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_2, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_4, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_4, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_microstep(MOTOR_6, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_6, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 
-						delay_ms(10);
-
-						if(abs(fangle_m0 - angle_m0) < 0.1)
-						{
-							motor_microstep(MOTOR_0, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("1\n\r");
-
-						}
-						if(abs(fangle_m1 - angle_m1) < 0.1)
-						{
-							motor_microstep(MOTOR_2, 1,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("2\n\r");
-						}
-						if(abs(fangle_m2 - angle_m2) < 0.1)
-						{
-							motor_microstep(MOTOR_4, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("3\n\r");
-						}
-						if(abs(fangle_m3 - angle_m3) < 0.1)
-						{
-							motor_microstep(MOTOR_6, 0,  100 * MOTOR_MICROSTEP_CONFIG, 100);
-							printf("4\n\r");
-						}
 
 						delay_ms(150);
 					}

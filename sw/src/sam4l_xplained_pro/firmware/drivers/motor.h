@@ -63,6 +63,7 @@ void motor_task();
 sMotorState motor_get_status(uMotorID motorID);
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM);
 void motor_set_dir(uMotorID motorID, uint8_t dir);
+void motor_set_power(uMotorID motorID, float power);
 float motor_get_abs(uMotorID motorID);
 
 #endif /*MOTOR_H*/
