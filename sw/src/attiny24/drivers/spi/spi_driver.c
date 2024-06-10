@@ -102,6 +102,7 @@ volatile unsigned char spi_ack_data[SPI_DATA_SIZE];
 
 volatile usidriverStatus_t spiX_status; //!< The driver status bits.
 volatile unsigned char data_counter = 0;
+unsigned char calculated_checksum = 0;
 
 
 ISR(PCINT1_vect)
@@ -143,14 +144,22 @@ ISR (USI_OVF_vect)
 	// exchange data between slave-master
 	spi_received_data[data_counter] = USIDR;
 	USIDR = spi_ack_data[data_counter];
-	data_counter++;
 
-	if(data_counter == SPI_DATA_CHECKSUM_POS)
+		
+	if(data_counter == 3)
+	{
+		if(calculated_checksum != spi_received_data[data_counter])
+			USIDR = SlaveERROR;
+	}
+
+	if(data_counter == 2)
 	{
 		spiX_status.doChecksum = 1;
 	}
 
-	if(data_counter >= SPI_DATA_SIZE)
+
+
+	if(data_counter == 4)
 	{
 		data_counter = 0;
 		spiX_status.transferComplete = 1;
@@ -158,7 +167,10 @@ ISR (USI_OVF_vect)
 	
 
 	// Update flags and clear USI counter
+	//update SLAVE data
+	
 	USISR = (1<<USIOIF);
+	data_counter++;
 }
 
 

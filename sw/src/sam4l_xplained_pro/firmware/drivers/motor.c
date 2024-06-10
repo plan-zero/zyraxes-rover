@@ -117,7 +117,7 @@ static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
 	uint8_t response = 0;
     uint8_t select_slave = 0;
     uint8_t in_data[4];
-    uint8_t data[4];
+    uint8_t data[5];
     int tryout = 5;
 
     data[0] = MOTOR_SYNC_CMD;
@@ -125,12 +125,13 @@ static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
     data[2] = 0;
     //calculate checksum
     data[3] = data[0] + data[1] + data[2];
+    data[4] = 0xff;
 
-    spi_sync_transfer(data[0], PCs, 1);
-	in_data[0] = spi_sync_transfer(data[1], PCs, 1);
-    in_data[1] = spi_sync_transfer(data[2], PCs, 1);
-    in_data[2] = spi_sync_transfer(data[3], PCs, 1);
-    in_data[3] = spi_sync_transfer(0xFF, PCs, 1);
+    spi_sync_transfer(data[0], PCs, 0);
+	in_data[0] = spi_sync_transfer(data[1], PCs, 0);
+    in_data[1] = spi_sync_transfer(data[2], PCs, 0);
+    in_data[2] = spi_sync_transfer(data[3], PCs, 0);
+    in_data[3] = spi_sync_transfer(data[4], PCs, 1);
 
     printf("Ret: %x%x%x%x \n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
 
@@ -138,11 +139,11 @@ static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
     {
         while(tryout--)
         {
-            spi_sync_transfer(data[0], PCs, 1);
-            in_data[0] = spi_sync_transfer(data[1], PCs, 1);
-            in_data[1] = spi_sync_transfer(data[2], PCs, 1);
-            in_data[2] = spi_sync_transfer(data[3], PCs, 1);
-            in_data[3] = spi_sync_transfer(0xFF, PCs, 1);
+            spi_sync_transfer(data[0], PCs, 0);
+            in_data[0] = spi_sync_transfer(data[1], PCs, 0);
+            in_data[1] = spi_sync_transfer(data[2], PCs, 0);
+            in_data[2] = spi_sync_transfer(data[3], PCs, 0);
+            in_data[3] = spi_sync_transfer(data[4], PCs, 1);
 
             printf(">Ret: %x%x%x%x \n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
 
@@ -167,7 +168,7 @@ static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
 static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t steps, uint8_t rpm)
 {
     uint8_t in_data[4];
-	uint8_t data[4];
+	uint8_t data[5];
     int tryout = 5;
 
     data[0] = MOTOR_STEP_CMD | (dir << 5) | ((steps & 0x1fff) >> 8);
@@ -175,12 +176,13 @@ static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t ste
     data[2] = rpm;
     //calculate checksum
     data[3] = data[0] + data[1] + data[2];
+    data[4] = 0xff;
 
-    in_data[0] = spi_sync_transfer(data[0], PCs, 0);
-	in_data[1] = spi_sync_transfer(data[1], PCs, 0);
-    in_data[2] = spi_sync_transfer(data[2], PCs, 0);
-    in_data[3] = spi_sync_transfer(data[3], PCs, 0);
-    in_data[4] = spi_sync_transfer(0xff, PCs, 0);
+    spi_sync_transfer(data[0], PCs, 0);
+	in_data[0] = spi_sync_transfer(data[1], PCs, 0);
+    in_data[1] = spi_sync_transfer(data[2], PCs, 0);
+    in_data[2] = spi_sync_transfer(data[3], PCs, 0);
+    in_data[3] = spi_sync_transfer(data[4], PCs, 0);
     
 
     printf("Ret: %x%x%x%x\n\r", in_data[0], in_data[1],in_data[2], in_data[3]);
@@ -193,7 +195,8 @@ static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t ste
             in_data[0] = spi_sync_transfer(data[1], PCs, 0);
             in_data[1] = spi_sync_transfer(data[2], PCs, 0);
             in_data[2] = spi_sync_transfer(data[3], PCs, 0);
-            in_data[3] = spi_sync_transfer(0xff, PCs, 0);
+            in_data[3] = spi_sync_transfer(data[4], PCs, 0);
+            
 
             printf(">Ret: %x%x%x%x\n\r", in_data[0], in_data[1],in_data[2], in_data[3]);
 
@@ -652,12 +655,12 @@ void motor_set_power(uMotorID motorID, float power)
 
     if(STATE_MOTOR_OK != _motors[motorID].state)
     {   
-        printf("motor_set_power: motor is not online, state= %d \n\r",  _motors[motorID].state);
+        printf("motor_set_power: motor %d is not online, state= %d \n\r", motorID,  _motors[motorID].state);
         return;
     }
 
-    uint8_t data[4];
-    uint8_t in_data[4];
+    uint8_t data[5];
+    uint8_t in_data[5];
     const float iMAX = 1.0;
     const float rSense = 0.150;
     int uMAX = (255/3.3)*(iMAX*10*rSense);
@@ -666,13 +669,14 @@ void motor_set_power(uMotorID motorID, float power)
 
     if(uPower < uMAX)
     {
-        printf("motor_set_power: Calculated uPower %d, sending... \n\r", uPower);
+        printf("motor_set_power: ID: %d Calculated uPower %d, sending... \n\r", motorID, uPower);
 
 
         data[0] = MOTOR_SETUP_CMD;
         data[1] = uPower;
         data[2] = 0; //TBD
         data[3] = data[0] + data[1] + data[2];
+        data[4] = 0xff;
 
         spi_sync_transfer(data[0], _motors[motorID].motorPCs, 0);
         in_data[0] = spi_sync_transfer(data[1], _motors[motorID].motorPCs, 0);
@@ -680,20 +684,19 @@ void motor_set_power(uMotorID motorID, float power)
         in_data[2] = spi_sync_transfer(data[3], _motors[motorID].motorPCs, 0);
         in_data[3] = spi_sync_transfer(0xFF, _motors[motorID].motorPCs, 1);
         
-        printf("motor_set_power: data_in %x%x%x%x\n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
+        printf("Ret: %x%x%x%x\n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
 
         if(in_data[3] != 0x78)
         {
             while(tryout--)
             {
-
                 spi_sync_transfer(data[0], _motors[motorID].motorPCs, 0);
                 in_data[0] = spi_sync_transfer(data[1], _motors[motorID].motorPCs, 0);
                 in_data[1] = spi_sync_transfer(data[2], _motors[motorID].motorPCs, 0);
                 in_data[2] = spi_sync_transfer(data[3], _motors[motorID].motorPCs, 0);
                 in_data[3] = spi_sync_transfer(0xFF, _motors[motorID].motorPCs, 1);
-
-                printf(">Ret:%x%x%x%x\n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
+                
+                printf(">Ret: %x%x%x%x\n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
 
                 if(in_data[3] == 0x78)
                 {

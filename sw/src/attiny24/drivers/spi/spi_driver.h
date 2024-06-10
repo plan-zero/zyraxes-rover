@@ -48,6 +48,8 @@ typedef struct  {
 
 extern volatile unsigned  char spi_received_data[SPI_DATA_SIZE];
 extern volatile usidriverStatus_t spiX_status;
+extern unsigned char calculated_checksum;
+
 
 void spiX_initslave(char spi_mode);
 char spiX_put(unsigned char val);

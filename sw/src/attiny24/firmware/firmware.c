@@ -138,7 +138,6 @@ int main()
 	uint16_t rpm_to_us = 0;
 	uint8_t effort_to_set = 0;
 	uint8_t checksum = 0;
-	uint8_t calculated_checksum = 0;
 
 	spiX_put(SlaveSYNC);
 
@@ -165,27 +164,21 @@ int main()
 
 		if(spiX_status.doChecksum)
 		{
-			checksum = spi_received_data[3];
+			
 			master_cmd = spi_received_data[0] >> 6;
 			calculated_checksum = spi_received_data[0] + spi_received_data[1] + spi_received_data[2];
-			if(checksum != calculated_checksum)
+
+			if(master_cmd == MasterSYNC)
 			{
-				spiX_put(SlaveERROR);
+				spiX_put(SlaveSYNC);
 			}
-			else
+			else if (master_cmd == MasterSTEP)
 			{
-				if(master_cmd == MasterSYNC)
-				{
-					spiX_put(SlaveSYNC);
-				}
-				else if (master_cmd == MasterSTEP)
-				{
-					spiX_put(SlaveSTEP);
-				}
-				else if (master_cmd == MasterSETUP)
-				{
-					spiX_put(SlaveSETUP);
-				}
+				spiX_put(SlaveSTEP);
+			}
+			else if (master_cmd == MasterSETUP)
+			{
+				spiX_put(SlaveSETUP);
 			}
 			spiX_status.doChecksum = 0;
 		}
@@ -193,6 +186,7 @@ int main()
 		{
 
 			master_cmd = spi_received_data[0] >> 6;
+			checksum = spi_received_data[3];
 
 			if(checksum == calculated_checksum)
 			{

@@ -17,10 +17,10 @@
 #define SPI_CLK_PHASE 1
 
 /* Delay before SPCK. */
-#define SPI_DLYBS 220
+#define SPI_DLYBS 300
 
 /* Delay between consecutive transfers. */
-#define SPI_DLYBCT 40
+#define SPI_DLYBCT 80
 
 
 /* Chip select. */
@@ -30,8 +30,8 @@
 #define SPI_CHIP_SEL_3 3
 
 /* SPI clock setting (Hz). */
-static uint32_t gs_ul_spi_clock = 3000000;
-#define SPI_TIMEOUT_READ 100 //500us
+static uint32_t gs_ul_spi_clock = 2500000;
+#define SPI_TIMEOUT_READ 1000 //500us
 
 
 uint8_t spi_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last);

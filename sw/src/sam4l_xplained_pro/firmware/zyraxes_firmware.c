@@ -259,7 +259,7 @@ int main(void)
 	int interrupt_us = 0;
 	int interrupt_hz = 0;
 
-	uint8_t spi_data1 = 0, spi_data2 = 0, spi_data3 = 0;
+	uint8_t spi_data[4];
 	int toggle = 0;
 	int process_extended = 0;
 
@@ -523,22 +523,12 @@ int main(void)
 				}
 			break;
 			case 'k':
-
-				if(toggle)
-				{
-					spi_data1 = spi_sync_transfer(0x7F, SPI_CHIP_PCS_0, 0);
-					spi_data2 = spi_sync_transfer(0xff, SPI_CHIP_PCS_0, 0);
-					spi_data3 = spi_sync_transfer(187, SPI_CHIP_PCS_0, 1);
-					printf("SPI: %x%x%x \n\r", spi_data1, spi_data2, spi_data3);
-				}
-				else
-				{
-					spi_data1 = spi_sync_transfer(0x6C, SPI_CHIP_PCS_0, 0);
-					spi_data2 = spi_sync_transfer(0x80, SPI_CHIP_PCS_0, 0);
-					spi_data3 = spi_sync_transfer(187, SPI_CHIP_PCS_0, 1);
-					printf("SPI: %x%x%x \n\r", spi_data1, spi_data2, spi_data3);
-				}
-				toggle ^= 1;
+				spi_sync_transfer(0xc0, 0x6, 0);
+				spi_data[0] = spi_sync_transfer(0, 0x6, 0);
+				spi_data[1] = spi_sync_transfer(0, 0x6, 0);
+				spi_data[2] = spi_sync_transfer(0xc0+0+0, 0x6, 0);
+				spi_data[3] = spi_sync_transfer(0xff, 0x6, 1);
+				printf("SPI: %x%x%x%x \n\r", spi_data[0],spi_data[1],spi_data[2],spi_data[3]);
 			break;
 
 			default:
