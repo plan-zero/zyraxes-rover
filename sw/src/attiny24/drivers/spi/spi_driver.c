@@ -113,6 +113,8 @@ ISR(PCINT1_vect)
 		USI_DIR_REG |= (1<<USI_DATAOUT_PIN);
 		//enable interrupt
 		USICR |= (1<<USIOIE);
+		//disable timer interrupt
+		TIMSK1 &= ~(1 << OCIE1A);
 		//reinit data counter to zero
 		data_counter = 0;
 	}
@@ -174,7 +176,7 @@ void spiX_initslave( char spi_mode )
 	//keep output disabled to allow other slaves comunicate
 	USI_DIR_REG &= ~(1<<USI_DATAOUT_PIN);                      // Outputs.
 	USI_DIR_REG &= ~(1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN); // Inputs.
-	//USI_OUT_REG |= (1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN);  // Pull-ups.
+	USI_OUT_REG |= (1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN);  // Pull-ups.
 
 	// Configure CS as slave
 	USI_CS_DIR &= ~(1<<USI_CS_PIN);

@@ -20,7 +20,7 @@
 #define SPI_DRIVER_H
 
 #define SPI_DATA_SIZE 5
-#define SPI_DATA_CHECKSUM_POS 3
+#define SPI_DATA_CHECKSUM_POS 4
 
 #define SLAVE_ACK 0xAA
 

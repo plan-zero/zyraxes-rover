@@ -75,6 +75,7 @@ static void display_menu(void)
 
 volatile int do_motor_task = 0;
 volatile int count = 0;
+volatile int timer_timeout = 0;
 
 void TC00_Handler(void)
 {
@@ -87,6 +88,21 @@ void TC00_Handler(void)
 
 	do_motor_task = 1;
 
+}
+
+void TC10_Handler(void)
+{
+	
+
+	int ul_dummy;
+	/* Clear status bit to acknowledge interrupt */
+	ul_dummy = tc_get_status(TC1, 0);
+
+	//printf("TC1 handler \n\r");
+	timer_timeout = 1;
+
+	/* Avoid compiler warning */
+	UNUSED(ul_dummy);
 }
 
 /**
@@ -115,6 +131,32 @@ static void configure_tc(uint32_t freq)
 	//tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
 
 	tc_start(TC0, 0);
+
+}
+
+static void configure_tc1(uint32_t freq)
+{
+	uint32_t ul_div;
+	uint32_t ul_tcclks;
+	uint32_t ul_sysclk = sysclk_get_cpu_hz();
+	uint32_t handler_freq_hz = freq;
+
+	/* Configure TC0 */
+	sysclk_enable_peripheral_clock(TC1);
+
+	/* Configure TC for a 5Hz frequency and trigger on RC compare. */
+	if (!tc_find_mck_divisor(handler_freq_hz, ul_sysclk, &ul_div, &ul_tcclks, ul_sysclk)) {
+		puts("No valid divisor found!\r");
+		return;
+	}
+	tc_init(TC1, 0, ul_tcclks | TC_CMR_CPCTRG);
+	tc_write_rc(TC1, 0, (ul_sysclk / ul_div) / handler_freq_hz);
+
+	/* Configure and enable interrupt on RC compare */
+	NVIC_EnableIRQ((IRQn_Type) TC10_IRQn);
+	tc_enable_interrupt(TC1, 0, TC_IER_CPCS);
+
+	tc_start(TC1, 0);
 
 }
 
@@ -179,14 +221,14 @@ int main(void)
 
 	//wait for motors driver to start
 	delay_ms(2000);
-	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0, 1);
-	motor_init(MOTOR_1, SPI_CHIP_PCS_2, SPI_CHIP_PCS_3, 0, 1);
-	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0, 1);
-	motor_init(MOTOR_3, SPI_CHIP_PCS_6, SPI_CHIP_PCS_7, 0, 1);
-	motor_init(MOTOR_4, SPI_CHIP_PCS_8, SPI_CHIP_PCS_9, 0, 1);
-	motor_init(MOTOR_5, SPI_CHIP_PCS_10, SPI_CHIP_PCS_11, 0, 1);
-	motor_init(MOTOR_6, SPI_CHIP_PCS_12, SPI_CHIP_PCS_13, 0, 1);
-	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 1);
+	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0, 5.18);
+	motor_init(MOTOR_1, SPI_CHIP_PCS_2, SPI_CHIP_PCS_3, 0, 5.18);
+	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0, 5.18);
+	motor_init(MOTOR_3, SPI_CHIP_PCS_6, SPI_CHIP_PCS_7, 0, 5.18);
+	motor_init(MOTOR_4, SPI_CHIP_PCS_8, SPI_CHIP_PCS_9, 0, 5.18);
+	motor_init(MOTOR_5, SPI_CHIP_PCS_10, SPI_CHIP_PCS_11, 0, 5.18);
+	motor_init(MOTOR_6, SPI_CHIP_PCS_12, SPI_CHIP_PCS_13, 0, 5.18);
+	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 5.18);
 	//wait to go to zero pozition
 	delay_ms(1000);
 	motor_set_power(MOTOR_0, 0.9);
@@ -207,6 +249,7 @@ int main(void)
 
 	//10ms
 	configure_tc(20);
+	//configure_tc1(2);
 
 	uMotorID selected_motor = MOTOR_COUNT;
 	uint8_t selected_dir = MOTOR_FORWARD;
@@ -231,6 +274,8 @@ int main(void)
 	float angle_m0 = 0, angle_m1 = 0, angle_m2 = 0, angle_m3 = 0;
 	float fangle_m0 = 0, fangle_m1 = 0, fangle_m2 = 0, fangle_m3 = 0;
 
+	int rover_state = 0;
+
 
 	while (1) {
 		//scanf("%c", (char *)&uc_key);
@@ -243,7 +288,7 @@ int main(void)
 			switch (uc_key) {
 
 			case 'x':
-				command_mode = 1;
+				//command_mode = 1;
 			break;					
 			case 0x1b:
 				process_extended = 1;
@@ -278,19 +323,36 @@ int main(void)
 			case 0x41: //forward
 				if(process_extended)
 				{
-					//printf("Forward \n\r");
-					process_extended = 0;
 
-					motor_microstep(MOTOR_5, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_5, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					motor_microstep(MOTOR_1, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_1, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					//tc_enable_interrupt(TC1, 0, TC_IER_CPCS);
+					//tc_start(0);
+					//if(rover_state == 1)
+				//	{
+						//rover is idle, start moving
+				//		for(int i = 1; i < 6; i++)
+				//		{
+				//			motor_microstep(MOTOR_5, 1,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
+				//			motor_microstep(MOTOR_1, 1,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
+				//			motor_microstep(MOTOR_7, 0,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
+				//			motor_microstep(MOTOR_3, 0,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
+				//			delay_ms(64)
+				//		}
 
-					motor_microstep(MOTOR_7, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_7, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					motor_microstep(MOTOR_3, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_3, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					delay_ms(320);
+						//delay_ms(320);
+				//		rover_state = 0;
+				//	}
+				//	else
+				//	{					
+						//printf("Forward \n\r");
+						process_extended = 0;
+
+						motor_microstep(MOTOR_5, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+						motor_microstep(MOTOR_1, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+
+						motor_microstep(MOTOR_7, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+						motor_microstep(MOTOR_3, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+						delay_ms(320);
+				//	}
 				}
 			break;
 
@@ -482,6 +544,14 @@ int main(void)
 			default:
 				break;
 			}
+		}
+
+		if(timer_timeout)
+		{
+			timer_timeout = 0;
+			//set rover idle
+			rover_state = 1;
+			tc_disable_interrupt(TC1, 0, TC_IER_CPCS);
 		}
 
 		if(do_motor_task){

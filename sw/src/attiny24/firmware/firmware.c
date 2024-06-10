@@ -149,9 +149,7 @@ int main()
 			PORTB &= ~(1 << PB0);
 			if(steps_to_do)
 			{
-				cli();
 				step(dir);
-				sei();
 				//if this is free running
 				if(steps_to_do != 0x1fff)
 					steps_to_do--;
@@ -191,8 +189,7 @@ int main()
 			}
 			spiX_status.doChecksum = 0;
 		}
-
-		if(spiX_status.transferComplete)
+		else if(spiX_status.transferComplete)
 		{
 
 			master_cmd = spi_received_data[0] >> 6;

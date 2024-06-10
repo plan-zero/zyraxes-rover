@@ -15,13 +15,13 @@ const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP
 
 const float startup_angle[MOTOR_COUNT] = 
 {
-    0.0,
-    330,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
+    43,
+    0,
+    65,
+    0,
+    4.5,
+    0,
+    75,
     0
 };
 
@@ -138,13 +138,13 @@ static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
     {
         while(tryout--)
         {
-            printf("retry cmd \n\r");
-
             spi_sync_transfer(data[0], PCs, 1);
             in_data[0] = spi_sync_transfer(data[1], PCs, 1);
             in_data[1] = spi_sync_transfer(data[2], PCs, 1);
             in_data[2] = spi_sync_transfer(data[3], PCs, 1);
             in_data[3] = spi_sync_transfer(0xFF, PCs, 1);
+
+            printf(">Ret: %x%x%x%x \n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
 
             if(in_data[3] == 0xAA)
             {
@@ -176,11 +176,11 @@ static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t ste
     //calculate checksum
     data[3] = data[0] + data[1] + data[2];
 
-    spi_sync_transfer(data[0], PCs, 0);
-	in_data[0] = spi_sync_transfer(data[1], PCs, 0);
-    in_data[1] = spi_sync_transfer(data[2], PCs, 0);
-    in_data[2] = spi_sync_transfer(data[3], PCs, 0);
-    in_data[3] = spi_sync_transfer(0xff, PCs, 1);
+    in_data[0] = spi_sync_transfer(data[0], PCs, 0);
+	in_data[1] = spi_sync_transfer(data[1], PCs, 0);
+    in_data[2] = spi_sync_transfer(data[2], PCs, 0);
+    in_data[3] = spi_sync_transfer(data[3], PCs, 0);
+    in_data[4] = spi_sync_transfer(0xff, PCs, 0);
     
 
     printf("Ret: %x%x%x%x\n\r", in_data[0], in_data[1],in_data[2], in_data[3]);
@@ -189,12 +189,13 @@ static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t ste
     {
         while(tryout--)
         {
-            printf("retry cmd \n\r");
             spi_sync_transfer(data[0], PCs, 0);
             in_data[0] = spi_sync_transfer(data[1], PCs, 0);
             in_data[1] = spi_sync_transfer(data[2], PCs, 0);
             in_data[2] = spi_sync_transfer(data[3], PCs, 0);
-            in_data[3] = spi_sync_transfer(0xff, PCs, 1);
+            in_data[3] = spi_sync_transfer(0xff, PCs, 0);
+
+            printf(">Ret: %x%x%x%x\n\r", in_data[0], in_data[1],in_data[2], in_data[3]);
 
             if(in_data[3] == 0x77)
             {
@@ -685,12 +686,14 @@ void motor_set_power(uMotorID motorID, float power)
         {
             while(tryout--)
             {
-                printf("retry cmd \n\r");
+
                 spi_sync_transfer(data[0], _motors[motorID].motorPCs, 0);
                 in_data[0] = spi_sync_transfer(data[1], _motors[motorID].motorPCs, 0);
                 in_data[1] = spi_sync_transfer(data[2], _motors[motorID].motorPCs, 0);
                 in_data[2] = spi_sync_transfer(data[3], _motors[motorID].motorPCs, 0);
                 in_data[3] = spi_sync_transfer(0xFF, _motors[motorID].motorPCs, 1);
+
+                printf(">Ret:%x%x%x%x\n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
 
                 if(in_data[3] == 0x78)
                 {
@@ -731,7 +734,7 @@ float tmp_angle = 0;
 void motor_task()
 {
 
-    for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
+    for(int i = MOTOR_0; i < MOTOR_COUNT; i+=2) //filter only dir motors
     {
         if(_motors[i].state == STATE_MOTOR_OK)
         {
