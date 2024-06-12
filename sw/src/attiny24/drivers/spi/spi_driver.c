@@ -146,20 +146,20 @@ ISR (USI_OVF_vect)
 	USIDR = spi_ack_data[data_counter];
 
 		
-	if(data_counter == 3)
+	if(data_counter == SPI_POS_CHECKSUM_COMPLETE)
 	{
 		if(calculated_checksum != spi_received_data[data_counter])
 			USIDR = SlaveERROR;
 	}
 
-	if(data_counter == 2)
+	if(data_counter == SPI_POS_DO_CHECKSUM)
 	{
 		spiX_status.doChecksum = 1;
 	}
 
 
 
-	if(data_counter == 4)
+	if(data_counter == SPI_POS_TRANSFER_COMPLETE)
 	{
 		data_counter = 0;
 		spiX_status.transferComplete = 1;

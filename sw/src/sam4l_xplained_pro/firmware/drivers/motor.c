@@ -15,13 +15,13 @@ const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP
 
 const float startup_angle[MOTOR_COUNT] = 
 {
-    43,
+    96.24,
     0,
-    65,
+    121.2,
     0,
-    4.5,
+    357.8,
     0,
-    75,
+    140.3,
     0
 };
 
@@ -321,11 +321,14 @@ float motor_get_abs(uMotorID motorID)
 {
     //read angle from sensor
     float sign = -1.0;
-    if(_motors[motorID].dir)
-    {
-        sign = 1.0;   
-    }
-    float abs_pos = (_motors[motorID].init_angle + ( (float)_motors[motorID].rotations * 360.0) + ( sign * _motors[motorID].angle_set) ) / _motors[motorID].gearbox; 
+   // if(_motors[motorID].dir == MOTOR_FORWARD)
+   // {
+  //      sign = 1.0;   
+  //  }
+    //char str[8];
+	//snprintf(str, sizeof(str), "%f", _motors[motorID].init_angle);
+	//printf("dbg Angle %s \n\r",str);
+    float abs_pos = (_motors[motorID].init_angle + ( (float)_motors[motorID].rotations * 360.0) + ( _motors[motorID].angle_set) * sign) / _motors[motorID].gearbox; 
     return abs_pos;
 }
 
@@ -733,6 +736,7 @@ void motor_set_dir(uMotorID motorID, uint8_t dir)
 int task_count = 0;
 char str[5];
 float tmp_angle = 0;
+int dir_sign = 0;
 
 void motor_task()
 {
@@ -744,11 +748,14 @@ void motor_task()
             //read current angle
             _motors[i].angle = motor_read_angle(i);
             tmp_angle = (_motors[i].init_angle - _motors[i].angle);
+            if(tmp_angle < 0)
+                dir_sign = 1;
             if( abs(tmp_angle) > 180.0 )
             {
                 //wrap arround, taking this into account
                 tmp_angle = 360.0 - abs(tmp_angle);
-                if(_motors[i].dir == MOTOR_FORWARD)
+                //if(_motors[i].dir == MOTOR_FORWARD)
+                if(dir_sign == 0)
                     _motors[i].rotations++;
                 else
                     _motors[i].rotations--;
@@ -756,6 +763,7 @@ void motor_task()
             _motors[i].angular_speed = abs(tmp_angle) / 0.05; //50ms task, deg/second
             _motors[i].calculated_rpm = _motors[i].angular_speed * 0.1666; //calculate actual RPM
             _motors[i].init_angle =  _motors[i].angle;
+            dir_sign = 0;
         }
     }
 

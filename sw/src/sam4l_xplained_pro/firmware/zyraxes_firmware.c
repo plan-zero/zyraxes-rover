@@ -435,7 +435,7 @@ int main(void)
 				printf("Do 360 rotation test on motor: %d  \n\r", selected_motor);
 				if(selected_motor < MOTOR_COUNT)
 				{
-					motor_microstep(selected_motor, selected_dir,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					motor_microstep(selected_motor, selected_dir,  50 * MOTOR_MICROSTEP_CONFIG, 100);
 					delay_us(motor_speed);
 				}
 				break;
