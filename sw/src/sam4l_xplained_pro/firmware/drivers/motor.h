@@ -41,8 +41,9 @@ typedef struct {
     int rotations;
 
     //motor absolute set position and current absolute pos (deg)
-    float angle_set;
-    float angle_absolute_pos;
+    float angle_zero_set;
+    float angle_absolute_set;
+    int motor_position_needs_update;
     //go to zero position
     uint8_t go_zero;
     //gearbox value
@@ -60,6 +61,7 @@ void motor_calibrate(uMotorID motorID);
 void motor_sync(uMotorID motorID);
 void motor_printout(uMotorID motorID);
 void motor_task();
+void motor_set_angle(uMotorID motorID, float angle);
 sMotorState motor_get_status(uMotorID motorID);
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM);
 void motor_set_dir(uMotorID motorID, uint8_t dir);

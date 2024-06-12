@@ -15,7 +15,7 @@ const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP
 
 const float startup_angle[MOTOR_COUNT] = 
 {
-    96.24,
+    94.24,
     0,
     121.2,
     0,
@@ -268,12 +268,14 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
         _motors[motorID].angular_speed = 0;
         _motors[motorID].rotations = 0;
         //set the initial angle
-        _motors[motorID].angle_set = startup_angle[motorID];
+        _motors[motorID].angle_zero_set = startup_angle[motorID];
         _motors[motorID].go_zero = go_zero;
+        _motors[motorID].angle_absolute_set = 0;
+        _motors[motorID].motor_position_needs_update = 0;
 
         if(go_zero)
         {
-            float delta_angle = _motors[motorID].angle_set - _motors[motorID].init_angle;
+            float delta_angle = _motors[motorID].angle_zero_set - _motors[motorID].init_angle;
             unsigned int steps_to_zero = 0;
 
 
@@ -310,8 +312,8 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
 
             _motors[motorID].init_angle = motor_read_angle(motorID);
             _motors[motorID].angle = _motors[motorID].init_angle;
-            //take this as zero pos
-            _motors[motorID].angle_absolute_pos = 0;
+          
+            
         }
     }
 
@@ -328,7 +330,7 @@ float motor_get_abs(uMotorID motorID)
     //char str[8];
 	//snprintf(str, sizeof(str), "%f", _motors[motorID].init_angle);
 	//printf("dbg Angle %s \n\r",str);
-    float abs_pos = (_motors[motorID].init_angle + ( (float)_motors[motorID].rotations * 360.0) + ( _motors[motorID].angle_set) * sign) / _motors[motorID].gearbox; 
+    float abs_pos = (_motors[motorID].init_angle + ( (float)_motors[motorID].rotations * 360.0) + ( _motors[motorID].angle_zero_set) * sign) / _motors[motorID].gearbox; 
     return abs_pos;
 }
 
@@ -420,6 +422,12 @@ void motor_printout(uMotorID motorID)
         if( (i % 16 == 0) && (i != 0) )
             printf("\n\r");
     }
+}
+
+void motor_set_angle(uMotorID motorID, float angle)
+{
+    _motors[motorID].angle_absolute_set = angle;
+    _motors[motorID].motor_position_needs_update = 1;
 }
 
 void motor_calibrate(uMotorID motorID) { 
@@ -738,6 +746,10 @@ char str[5];
 float tmp_angle = 0;
 int dir_sign = 0;
 
+
+float delta_abs = 0;
+int steps_to_do = 0;
+
 void motor_task()
 {
 
@@ -764,6 +776,24 @@ void motor_task()
             _motors[i].calculated_rpm = _motors[i].angular_speed * 0.1666; //calculate actual RPM
             _motors[i].init_angle =  _motors[i].angle;
             dir_sign = 0;
+        }
+
+        if(_motors[i].motor_position_needs_update)
+        {
+            //calculate next position
+            delta_abs = motor_get_abs(i) - _motors[i].angle_absolute_set;
+
+            steps_to_do = (unsigned int)(abs(delta_abs) / angle_step_conv * _motors[i].gearbox);
+            if(delta_abs <= 0){
+                _motor_micro_step(_motors[i].motorPCs, MOTOR_REVERSE, steps_to_do, 50);
+                //printf("1\n\r");
+            }
+            else
+            {
+                _motor_micro_step(_motors[i].motorPCs, MOTOR_FORWARD, steps_to_do, 50);
+                //printf("2\n\r");
+            }
+            _motors[i].motor_position_needs_update = 0;
         }
     }
 

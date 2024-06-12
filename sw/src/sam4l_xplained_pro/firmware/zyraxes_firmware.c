@@ -300,21 +300,25 @@ int main(void)
 					{
 						left--;
 						right++;
+
+						printf("Set left %d right %d \n\r", left, right);
+						motor_set_angle(MOTOR_0, 10 * right );
+						motor_set_angle(MOTOR_2, 10 * right );
 						//printf("Left \n\r");
 
-						motor_microstep(MOTOR_0, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_0, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_2, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_0, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_2, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_2, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 
-						motor_microstep(MOTOR_4, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_4, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_6, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_4, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_6, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_6, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 
 						
 
-						delay_ms(150);
+						//delay_ms(150);
 					}
 					process_extended = 0;
 				}
@@ -381,20 +385,22 @@ int main(void)
 					{
 						right--;
 						left++;
-
+						printf("Set left %d right %d \n\r", left, right);
+						motor_set_angle(MOTOR_0, 10 * right );
+						motor_set_angle(MOTOR_2, 10 * right );
 
 						//printf("Right \n\r");
-						motor_microstep(MOTOR_0, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_0, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_2, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_0, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_2, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_4, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_2, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_4, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						motor_microstep(MOTOR_6, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_4, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						//motor_microstep(MOTOR_6, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 						//motor_microstep(MOTOR_6, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
 
 
-						delay_ms(150);
+						//delay_ms(150);
 					}
 
 					
