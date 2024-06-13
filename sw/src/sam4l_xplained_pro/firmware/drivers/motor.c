@@ -19,9 +19,9 @@ const float startup_angle[MOTOR_COUNT] =
     0,
     121.2,
     0,
-    357.8,
+    4,
     0,
-    140.3,
+    130.16,
     0
 };
 
@@ -785,12 +785,12 @@ void motor_task()
 
             steps_to_do = (unsigned int)(abs(delta_abs) / angle_step_conv * _motors[i].gearbox);
             if(delta_abs <= 0){
-                _motor_micro_step(_motors[i].motorPCs, MOTOR_REVERSE, steps_to_do, 50);
+                _motor_micro_step(_motors[i].motorPCs, MOTOR_REVERSE, steps_to_do, 100);
                 //printf("1\n\r");
             }
             else
             {
-                _motor_micro_step(_motors[i].motorPCs, MOTOR_FORWARD, steps_to_do, 50);
+                _motor_micro_step(_motors[i].motorPCs, MOTOR_FORWARD, steps_to_do, 100);
                 //printf("2\n\r");
             }
             _motors[i].motor_position_needs_update = 0;

@@ -255,7 +255,8 @@ int main(void)
 	uint8_t selected_dir = MOTOR_FORWARD;
 	int motor_speed = MOTOR_MICROSTEP_WAIT_US;
 	int ati_cmd = 0;
-	int run_timer = 0;
+	//start with motor task enabled
+	int run_timer = 1;
 	int interrupt_us = 0;
 	int interrupt_hz = 0;
 
@@ -276,6 +277,7 @@ int main(void)
 
 	int rover_state = 0;
 
+	tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
 
 	while (1) {
 		//scanf("%c", (char *)&uc_key);
@@ -304,22 +306,30 @@ int main(void)
 						printf("Set left %d right %d \n\r", left, right);
 						motor_set_angle(MOTOR_0, 10 * right );
 						motor_set_angle(MOTOR_2, 10 * right );
-						//printf("Left \n\r");
 
-						//motor_microstep(MOTOR_0, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_0, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_2, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_2, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
+						motor_set_angle(MOTOR_4, -10 * right );
+						motor_set_angle(MOTOR_6, -10 * right );
 
-						//motor_microstep(MOTOR_4, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_4, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_6, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_6, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-
-						
-
-						//delay_ms(150);
 					}
+					process_extended = 0;
+				}
+			break;
+			case 0x43: //right
+				if(process_extended)
+				{
+					if(right >= -3)
+					{
+						right--;
+						left++;
+						printf("Set left %d right %d \n\r", left, right);
+						motor_set_angle(MOTOR_0, 10 * right );
+						motor_set_angle(MOTOR_2, 10 * right );
+
+						motor_set_angle(MOTOR_4, -10 * right );
+						motor_set_angle(MOTOR_6, -10 * right );
+					}
+
+					
 					process_extended = 0;
 				}
 			break;
@@ -378,35 +388,7 @@ int main(void)
 				}
 			break;
 
-			case 0x43: //right
-				if(process_extended)
-				{
-					if(right >= -3)
-					{
-						right--;
-						left++;
-						printf("Set left %d right %d \n\r", left, right);
-						motor_set_angle(MOTOR_0, 10 * right );
-						motor_set_angle(MOTOR_2, 10 * right );
 
-						//printf("Right \n\r");
-						//motor_microstep(MOTOR_0, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_0, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_2, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_2, 1,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_4, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_4, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_6, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-						//motor_microstep(MOTOR_6, 0,  30 * MOTOR_MICROSTEP_CONFIG, 100);
-
-
-						//delay_ms(150);
-					}
-
-					
-					process_extended = 0;
-				}
-			break;
 			case '0':
 			case '1':
 			case '2':
