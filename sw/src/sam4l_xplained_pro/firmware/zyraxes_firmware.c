@@ -99,7 +99,7 @@ void TC10_Handler(void)
 	ul_dummy = tc_get_status(TC1, 0);
 
 	//printf("TC1 handler \n\r");
-	timer_timeout = 1;
+	timer_timeout++;
 
 	/* Avoid compiler warning */
 	UNUSED(ul_dummy);
@@ -154,7 +154,7 @@ static void configure_tc1(uint32_t freq)
 
 	/* Configure and enable interrupt on RC compare */
 	NVIC_EnableIRQ((IRQn_Type) TC10_IRQn);
-	tc_enable_interrupt(TC1, 0, TC_IER_CPCS);
+	//tc_enable_interrupt(TC1, 0, TC_IER_CPCS);
 
 	tc_start(TC1, 0);
 
@@ -249,7 +249,8 @@ int main(void)
 
 	//10ms
 	configure_tc(20);
-	//configure_tc1(2);
+	//200ms
+	configure_tc1(5);
 
 	uMotorID selected_motor = MOTOR_COUNT;
 	uint8_t selected_dir = MOTOR_FORWARD;
@@ -337,53 +338,43 @@ int main(void)
 			case 0x41: //forward
 				if(process_extended)
 				{
+					printf("Forward\n\r");
+					timer_timeout = 0;
+					tc_start(TC1, 0);
+					tc_enable_interrupt(TC1, 0, TC_IER_CPCS);
 
-					//tc_enable_interrupt(TC1, 0, TC_IER_CPCS);
-					//tc_start(0);
-					//if(rover_state == 1)
-				//	{
-						//rover is idle, start moving
-				//		for(int i = 1; i < 6; i++)
-				//		{
-				//			motor_microstep(MOTOR_5, 1,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
-				//			motor_microstep(MOTOR_1, 1,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
-				//			motor_microstep(MOTOR_7, 0,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
-				//			motor_microstep(MOTOR_3, 0,  40 * MOTOR_MICROSTEP_CONFIG, 30 * i);
-				//			delay_ms(64)
-				//		}
+					if(rover_state == 0) //idle
+					{
+						rover_state = 1; //moving
+						motor_set_rpm(MOTOR_5, 1, 150);
+						motor_set_rpm(MOTOR_1, 1, 150);
+						motor_set_rpm(MOTOR_7, 0, 150);
+						motor_set_rpm(MOTOR_3, 0, 150);
 
-						//delay_ms(320);
-				//		rover_state = 0;
-				//	}
-				//	else
-				//	{					
-						//printf("Forward \n\r");
-						process_extended = 0;
-
-						motor_microstep(MOTOR_5, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-						motor_microstep(MOTOR_1, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-
-						motor_microstep(MOTOR_7, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-						motor_microstep(MOTOR_3, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-						delay_ms(320);
-				//	}
+						motor_soft_start();
+					}
+					process_extended = 0;
 				}
 			break;
 
 			case 0x42: //backward
 				if(process_extended)
 				{
-					//printf("Backward \n\r");
-					motor_microstep(MOTOR_5, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_5, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					motor_microstep(MOTOR_1, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_1, 0,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
+					printf("Backward\n\r");
+					timer_timeout = 0;
+					tc_start(TC1, 0);
+					tc_enable_interrupt(TC1, 0, TC_IER_CPCS);
 
-					motor_microstep(MOTOR_7, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_7, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					motor_microstep(MOTOR_3, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					//motor_microstep(MOTOR_3, 1,  MOTOR_SPR * MOTOR_MICROSTEP_CONFIG, 150);
-					delay_ms(320);
+					if(rover_state == 0) //idle
+					{
+						rover_state = 1; //moving
+						motor_set_rpm(MOTOR_5, 0, 150);
+						motor_set_rpm(MOTOR_1, 0, 150);
+						motor_set_rpm(MOTOR_7, 1, 150);
+						motor_set_rpm(MOTOR_3, 1, 150);
+
+						motor_soft_start();
+					}
 					process_extended = 0;
 				}
 			break;
@@ -524,12 +515,16 @@ int main(void)
 			}
 		}
 
-		if(timer_timeout)
+		//4 sec
+		if(timer_timeout >= 20)
 		{
 			timer_timeout = 0;
-			//set rover idle
-			rover_state = 1;
 			tc_disable_interrupt(TC1, 0, TC_IER_CPCS);
+			printf("DBG: Timeout event \n\r");
+
+			motor_soft_stop();
+			//move back to idle
+			rover_state = 0;
 		}
 
 		if(do_motor_task){

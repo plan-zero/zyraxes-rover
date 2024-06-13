@@ -44,6 +44,7 @@ typedef struct {
     float angle_zero_set;
     float angle_absolute_set;
     int motor_position_needs_update;
+    int idle;
     //go to zero position
     uint8_t go_zero;
     //gearbox value
@@ -67,5 +68,7 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM);
 void motor_set_dir(uMotorID motorID, uint8_t dir);
 void motor_set_power(uMotorID motorID, float power);
 float motor_get_abs(uMotorID motorID);
+void motor_soft_start();
+void motor_soft_stop();
 
 #endif /*MOTOR_H*/

@@ -244,6 +244,7 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
     _motors[motorID].us_per_microstep = 0;
     _motors[motorID].RPM = 0;
     _motors[motorID].gearbox = gearbox;
+    _motors[motorID].idle = 1;
 
     printf("motor_init: sync with motor driver, sending... \n\r");
 
@@ -657,7 +658,9 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
     _motors[motorID].RPM = RPM;
     _motors[motorID].us_per_microstep = microstep_wait;
 
-    _motor_micro_step( _motors[motorID].motorPCs, _motors[motorID].dir, 0x1fff, RPM);
+    //_motor_micro_step( _motors[motorID].motorPCs, _motors[motorID].dir, 0x1fff, RPM);
+    //user motor task instead
+    _motors[motorID].motor_position_needs_update = 1;
 
 }
 
@@ -750,6 +753,26 @@ int dir_sign = 0;
 float delta_abs = 0;
 int steps_to_do = 0;
 
+int soft_start = 0;
+int soft_stop = 0;
+
+#define RPM_MAX 3
+int rpm_count = 0;
+int rpm_soft_start[RPM_MAX] = {20, 60, 90};
+
+
+void motor_soft_start()
+{
+    soft_start = 1;
+    soft_stop = 0;
+}
+
+void motor_soft_stop()
+{
+    soft_start = 0;
+    soft_stop = 1;
+}
+
 void motor_task()
 {
 
@@ -796,7 +819,58 @@ void motor_task()
             _motors[i].motor_position_needs_update = 0;
         }
     }
+    // 100ms
+    if( (task_count % 2) == 0)
+    {
+        if(soft_start)
+        {
+            if(rpm_count < RPM_MAX)
+            {
+                printf("Do soft start %d \n\r", rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
 
+                rpm_count++;
+            }
+            else
+            {
+                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, _motors[5].RPM);
+                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, _motors[5].RPM);
+                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, _motors[5].RPM);
+                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, _motors[5].RPM);
+
+                printf("full speed \n\r");
+                rpm_count = RPM_MAX -1;
+                soft_start = 0;
+            }
+            
+        }
+        else if(soft_stop)
+        {
+            if(rpm_count >= 0)
+            {
+                printf("Do soft stop %d \n\r", rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                rpm_count--;
+            }
+            else
+            {
+                printf("stop motors \n\r");
+                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, 0);
+                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, 0);
+                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, 0);
+                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, 0);
+                rpm_count = 0;
+                soft_stop = 0;
+            }
+        }
+    }
+    // 1s
     if( (task_count % 20) == 0)
     {
         //printout stats for motors
@@ -804,11 +878,11 @@ void motor_task()
         {
             if(_motors[i].state == STATE_MOTOR_OK)
             {
-                snprintf(str, sizeof(str), "%f", _motors[i].angular_speed);
-                printf("ID: %d, as:%s", i, str);
-                snprintf(str, sizeof(str), "%f", _motors[i].calculated_rpm);
-                printf(", rpm:%s", str);
-                printf(", rot:%ld \n\r",  _motors[i].rotations);
+               // snprintf(str, sizeof(str), "%f", _motors[i].angular_speed);
+               // printf("ID: %d, as:%s", i, str);
+               // snprintf(str, sizeof(str), "%f", _motors[i].calculated_rpm);
+               // printf(", rpm:%s", str);
+               // printf(", rot:%ld \n\r",  _motors[i].rotations);
             }
         }
     }
