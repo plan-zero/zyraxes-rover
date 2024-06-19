@@ -10,6 +10,10 @@
 //this is conterclockwise
 #define MOTOR_REVERSE   0
 
+#define MOTORS_TURNING_POS 5
+extern int turning_speed_red[MOTORS_TURNING_POS];
+extern int motors_turning_position;
+
 typedef enum {
     STATE_MOTOR_UNKNOWN = 0,
     STATE_MOTOR_OK,

@@ -277,6 +277,7 @@ int main(void)
 	float fangle_m0 = 0, fangle_m1 = 0, fangle_m2 = 0, fangle_m3 = 0;
 
 	int rover_state = 0;
+	
 
 	tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
 
@@ -303,6 +304,7 @@ int main(void)
 					{
 						left--;
 						right++;
+						motors_turning_position = right;
 
 						printf("Set left %d right %d \n\r", left, right);
 						motor_set_angle(MOTOR_0, 10 * right );
@@ -321,6 +323,7 @@ int main(void)
 					if(right >= -3)
 					{
 						right--;
+						motors_turning_position = right;
 						left++;
 						printf("Set left %d right %d \n\r", left, right);
 						motor_set_angle(MOTOR_0, 10 * right );
@@ -350,13 +353,13 @@ int main(void)
 						{
 							motor_set_rpm(MOTOR_5, 1, 150);
 							motor_set_rpm(MOTOR_1, 1, 150);
-							motor_set_rpm(MOTOR_7, 0, 100);
-							motor_set_rpm(MOTOR_3, 0, 100);
+							motor_set_rpm(MOTOR_7, 0, 150 - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_3, 0, 150 - turning_speed_red[abs(right)]);
 						}
 						else if (right > 0)
 						{
-							motor_set_rpm(MOTOR_5, 1, 100);
-							motor_set_rpm(MOTOR_1, 1, 100);
+							motor_set_rpm(MOTOR_5, 1, 150 - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_1, 1, 150 - turning_speed_red[abs(right)]);
 							motor_set_rpm(MOTOR_7, 0, 150);
 							motor_set_rpm(MOTOR_3, 0, 150);
 						}
@@ -391,13 +394,13 @@ int main(void)
 						{
 							motor_set_rpm(MOTOR_5, 0, 150);
 							motor_set_rpm(MOTOR_1, 0, 150);
-							motor_set_rpm(MOTOR_7, 1, 100);
-							motor_set_rpm(MOTOR_3, 1, 100);
+							motor_set_rpm(MOTOR_7, 1, 150 - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_3, 1, 150 - turning_speed_red[abs(right)]);
 						}
 						else if (right > 0)
 						{
-							motor_set_rpm(MOTOR_5, 0, 100);
-							motor_set_rpm(MOTOR_1, 0, 100);
+							motor_set_rpm(MOTOR_5, 0, 150 - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_1, 0, 150 - turning_speed_red[abs(right)]);
 							motor_set_rpm(MOTOR_7, 1, 150);
 							motor_set_rpm(MOTOR_3, 1, 150);
 						}

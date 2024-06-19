@@ -25,6 +25,10 @@ const float startup_angle[MOTOR_COUNT] =
     0
 };
 
+
+int turning_speed_red[MOTORS_TURNING_POS] = {0, 15, 30, 45, 60};
+int motors_turning_position = 0;
+
 const float __attribute__((__aligned__(512))) lookup[MOTOR_COUNT][MAGNETIC_LUT_SIZE] = {
 //Put lookup table here!
 };
@@ -760,6 +764,7 @@ int soft_stop = 0;
 #define RPM_MAX 3
 int rpm_count = 0;
 int rpm_soft_start[RPM_MAX] = {20, 60, 90};
+int rpm_soft_start_diff[RPM_MAX] = {10, 40, 70};
 
 
 void motor_soft_start()
@@ -828,11 +833,27 @@ void motor_task()
             if(rpm_count < RPM_MAX)
             {
                 printf("Do soft start %d \n\r", rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
-
+                if(motors_turning_position > 0)
+                {
+                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                }
+                else if(motors_turning_position < 0)
+                {
+                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);           
+                }
+                else
+                {
+                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                }
                 rpm_count++;
             }
             else
@@ -853,10 +874,27 @@ void motor_task()
             if(rpm_count >= 0)
             {
                 printf("Do soft stop %d \n\r", rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                if(motors_turning_position > 0)
+                {
+                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                }
+                else if(motors_turning_position < 0)
+                {
+                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);           
+                }
+                else
+                {
+                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                }
                 rpm_count--;
             }
             else
