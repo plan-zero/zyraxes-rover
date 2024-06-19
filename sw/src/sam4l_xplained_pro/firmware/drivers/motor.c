@@ -664,7 +664,7 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
 
 }
 
-void motor_set_power(uMotorID motorID, float power)
+void motor_set_power(uMotorID motorID, float power, unsigned char motor_config)
 {
 
     if(STATE_MOTOR_OK != _motors[motorID].state)
@@ -688,7 +688,7 @@ void motor_set_power(uMotorID motorID, float power)
 
         data[0] = MOTOR_SETUP_CMD;
         data[1] = uPower;
-        data[2] = 0; //TBD
+        data[2] = motor_config; //TBD
         data[3] = data[0] + data[1] + data[2];
         data[4] = 0xff;
 
@@ -715,6 +715,7 @@ void motor_set_power(uMotorID motorID, float power)
                 if(in_data[3] == 0x78)
                 {
                     tryout = 0;
+                    _motors[motorID].power = power;
                     break;
                 }
             }
@@ -837,9 +838,9 @@ void motor_task()
             else
             {
                 _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, _motors[5].RPM);
-                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, _motors[5].RPM);
-                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, _motors[5].RPM);
-                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, _motors[5].RPM);
+                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, _motors[1].RPM);
+                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, _motors[7].RPM);
+                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, _motors[3].RPM);
 
                 printf("full speed \n\r");
                 rpm_count = RPM_MAX -1;
@@ -861,10 +862,10 @@ void motor_task()
             else
             {
                 printf("stop motors \n\r");
-                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, 0);
-                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, 0);
-                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, 0);
-                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, 0);
+                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0, 0);
+                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0, 0);
+                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0, 0);
+                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0, 0);
                 rpm_count = 0;
                 soft_stop = 0;
             }

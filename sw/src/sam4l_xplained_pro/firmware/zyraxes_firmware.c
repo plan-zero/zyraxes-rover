@@ -231,14 +231,14 @@ int main(void)
 	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 5.18);
 	//wait to go to zero pozition
 	delay_ms(1000);
-	motor_set_power(MOTOR_0, 0.9);
-	motor_set_power(MOTOR_1, 0.8);
-	motor_set_power(MOTOR_2, 0.9);
-	motor_set_power(MOTOR_3, 0.8);
-	motor_set_power(MOTOR_4, 0.9);
-	motor_set_power(MOTOR_5, 0.8);
-	motor_set_power(MOTOR_6, 0.9);
-	motor_set_power(MOTOR_7, 0.8);
+	motor_set_power(MOTOR_0, 0.8, 0xFA);
+	motor_set_power(MOTOR_1, 0.8, 0xFA);
+	motor_set_power(MOTOR_2, 0.8, 0xFA);
+	motor_set_power(MOTOR_3, 0.8, 0xFA);
+	motor_set_power(MOTOR_4, 0.8, 0xFA);
+	motor_set_power(MOTOR_5, 0.8, 0xFA);
+	motor_set_power(MOTOR_6, 0.8, 0xFA);
+	motor_set_power(MOTOR_7, 0.8, 0xFA);
 
 
 	//init pointer to the flash first page
@@ -346,10 +346,29 @@ int main(void)
 					if(rover_state == 0) //idle
 					{
 						rover_state = 1; //moving
-						motor_set_rpm(MOTOR_5, 1, 150);
-						motor_set_rpm(MOTOR_1, 1, 150);
-						motor_set_rpm(MOTOR_7, 0, 150);
-						motor_set_rpm(MOTOR_3, 0, 150);
+						if(right < 0)
+						{
+							motor_set_rpm(MOTOR_5, 1, 150);
+							motor_set_rpm(MOTOR_1, 1, 150);
+							motor_set_rpm(MOTOR_7, 0, 100);
+							motor_set_rpm(MOTOR_3, 0, 100);
+						}
+						else if (right > 0)
+						{
+							motor_set_rpm(MOTOR_5, 1, 100);
+							motor_set_rpm(MOTOR_1, 1, 100);
+							motor_set_rpm(MOTOR_7, 0, 150);
+							motor_set_rpm(MOTOR_3, 0, 150);
+						}
+						else
+						{
+							motor_set_rpm(MOTOR_5, 1, 150);
+							motor_set_rpm(MOTOR_1, 1, 150);
+							motor_set_rpm(MOTOR_7, 0, 150);
+							motor_set_rpm(MOTOR_3, 0, 150);
+						}
+						
+
 
 						motor_soft_start();
 					}
@@ -368,10 +387,27 @@ int main(void)
 					if(rover_state == 0) //idle
 					{
 						rover_state = 1; //moving
-						motor_set_rpm(MOTOR_5, 0, 150);
-						motor_set_rpm(MOTOR_1, 0, 150);
-						motor_set_rpm(MOTOR_7, 1, 150);
-						motor_set_rpm(MOTOR_3, 1, 150);
+						if(right < 0)
+						{
+							motor_set_rpm(MOTOR_5, 0, 150);
+							motor_set_rpm(MOTOR_1, 0, 150);
+							motor_set_rpm(MOTOR_7, 1, 100);
+							motor_set_rpm(MOTOR_3, 1, 100);
+						}
+						else if (right > 0)
+						{
+							motor_set_rpm(MOTOR_5, 0, 100);
+							motor_set_rpm(MOTOR_1, 0, 100);
+							motor_set_rpm(MOTOR_7, 1, 150);
+							motor_set_rpm(MOTOR_3, 1, 150);
+						}
+						else
+						{
+							motor_set_rpm(MOTOR_5, 0, 150);
+							motor_set_rpm(MOTOR_1, 0, 150);
+							motor_set_rpm(MOTOR_7, 1, 150);
+							motor_set_rpm(MOTOR_3, 1, 150);
+						}
 
 						motor_soft_start();
 					}
@@ -498,7 +534,7 @@ int main(void)
 				for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
 				{
 					if(motor_get_status(i) == STATE_MOTOR_OK)
-						motor_microstep(i, 0, 0, 0);
+						motor_set_power(i, 0.8, 0xFA);
 				}
 			break;
 			case 'k':

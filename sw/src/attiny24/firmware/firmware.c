@@ -27,9 +27,9 @@
 //const float rSense = 0.150;
 //volatile int uMAX = (255/3.3)*(iMAX*10*rSense);
 
-//this if for 1A
+//this if for 1.5A
 #define EFFORT_DEFAULT 37
-#define EFFORT_MAX	   115
+#define EFFORT_MAX	   173
 
 uint8_t EFFORT = EFFORT_DEFAULT;
 
@@ -212,6 +212,12 @@ int main()
 					if(effort_to_set > EFFORT_MAX)
 						effort_to_set = EFFORT_MAX;
 					EFFORT = effort_to_set;
+					if(spi_received_data[2] == 0xFA)
+					{
+						//turn off motors
+						INPORT &= 0xF0;
+					}
+
 				}
 			}
 

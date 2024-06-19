@@ -49,6 +49,8 @@ typedef struct {
     uint8_t go_zero;
     //gearbox value
     float gearbox;
+    //current power
+    float power;
 }sMotorInstance;
 
 
@@ -66,7 +68,7 @@ void motor_set_angle(uMotorID motorID, float angle);
 sMotorState motor_get_status(uMotorID motorID);
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM);
 void motor_set_dir(uMotorID motorID, uint8_t dir);
-void motor_set_power(uMotorID motorID, float power);
+void motor_set_power(uMotorID motorID, float power, unsigned char motor_config);
 float motor_get_abs(uMotorID motorID);
 void motor_soft_start();
 void motor_soft_stop();
