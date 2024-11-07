@@ -231,14 +231,14 @@ int main(void)
 	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 5.18);
 	//wait to go to zero pozition
 	delay_ms(1000);
-	motor_set_power(MOTOR_0, 0.8, 0xFA);
-	motor_set_power(MOTOR_1, 0.8, 0xFA);
-	motor_set_power(MOTOR_2, 0.8, 0xFA);
-	motor_set_power(MOTOR_3, 0.8, 0xFA);
-	motor_set_power(MOTOR_4, 0.8, 0xFA);
-	motor_set_power(MOTOR_5, 0.8, 0xFA);
-	motor_set_power(MOTOR_6, 0.8, 0xFA);
-	motor_set_power(MOTOR_7, 0.8, 0xFA);
+	motor_set_power(MOTOR_0, 0.9, 0xFA);
+	motor_set_power(MOTOR_1, 0.9, 0xFA);
+	motor_set_power(MOTOR_2, 0.9, 0xFA);
+	motor_set_power(MOTOR_3, 0.9, 0xFA);
+	motor_set_power(MOTOR_4, 0.9, 0xFA);
+	motor_set_power(MOTOR_5, 0.9, 0xFA);
+	motor_set_power(MOTOR_6, 0.9, 0xFA);
+	motor_set_power(MOTOR_7, 0.9, 0xFA);
 
 
 	//init pointer to the flash first page
@@ -254,7 +254,7 @@ int main(void)
 
 	uMotorID selected_motor = MOTOR_COUNT;
 	uint8_t selected_dir = MOTOR_FORWARD;
-	int motor_speed = MOTOR_MICROSTEP_WAIT_US;
+	int motor_speed = 150;
 	int ati_cmd = 0;
 	//start with motor task enabled
 	int run_timer = 1;
@@ -351,24 +351,24 @@ int main(void)
 						rover_state = 1; //moving
 						if(right < 0)
 						{
-							motor_set_rpm(MOTOR_5, 1, 150);
-							motor_set_rpm(MOTOR_1, 1, 150);
-							motor_set_rpm(MOTOR_7, 0, 150 - turning_speed_red[abs(right)]);
-							motor_set_rpm(MOTOR_3, 0, 150 - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_5, 1, motor_speed);
+							motor_set_rpm(MOTOR_1, 1, motor_speed);
+							motor_set_rpm(MOTOR_7, 0, motor_speed - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_3, 0, motor_speed - turning_speed_red[abs(right)]);
 						}
 						else if (right > 0)
 						{
-							motor_set_rpm(MOTOR_5, 1, 150 - turning_speed_red[abs(right)]);
-							motor_set_rpm(MOTOR_1, 1, 150 - turning_speed_red[abs(right)]);
-							motor_set_rpm(MOTOR_7, 0, 150);
-							motor_set_rpm(MOTOR_3, 0, 150);
+							motor_set_rpm(MOTOR_5, 1, motor_speed - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_1, 1, motor_speed - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_7, 0, motor_speed);
+							motor_set_rpm(MOTOR_3, 0, motor_speed);
 						}
 						else
 						{
-							motor_set_rpm(MOTOR_5, 1, 150);
-							motor_set_rpm(MOTOR_1, 1, 150);
-							motor_set_rpm(MOTOR_7, 0, 150);
-							motor_set_rpm(MOTOR_3, 0, 150);
+							motor_set_rpm(MOTOR_5, 1, motor_speed);
+							motor_set_rpm(MOTOR_1, 1, motor_speed);
+							motor_set_rpm(MOTOR_7, 0, motor_speed);
+							motor_set_rpm(MOTOR_3, 0, motor_speed);
 						}
 						
 
@@ -392,24 +392,24 @@ int main(void)
 						rover_state = 1; //moving
 						if(right < 0)
 						{
-							motor_set_rpm(MOTOR_5, 0, 150);
-							motor_set_rpm(MOTOR_1, 0, 150);
-							motor_set_rpm(MOTOR_7, 1, 150 - turning_speed_red[abs(right)]);
-							motor_set_rpm(MOTOR_3, 1, 150 - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_5, 0, motor_speed);
+							motor_set_rpm(MOTOR_1, 0, motor_speed);
+							motor_set_rpm(MOTOR_7, 1, motor_speed - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_3, 1, motor_speed - turning_speed_red[abs(right)]);
 						}
 						else if (right > 0)
 						{
-							motor_set_rpm(MOTOR_5, 0, 150 - turning_speed_red[abs(right)]);
-							motor_set_rpm(MOTOR_1, 0, 150 - turning_speed_red[abs(right)]);
-							motor_set_rpm(MOTOR_7, 1, 150);
-							motor_set_rpm(MOTOR_3, 1, 150);
+							motor_set_rpm(MOTOR_5, 0, motor_speed - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_1, 0, motor_speed - turning_speed_red[abs(right)]);
+							motor_set_rpm(MOTOR_7, 1, motor_speed);
+							motor_set_rpm(MOTOR_3, 1, motor_speed);
 						}
 						else
 						{
-							motor_set_rpm(MOTOR_5, 0, 150);
-							motor_set_rpm(MOTOR_1, 0, 150);
-							motor_set_rpm(MOTOR_7, 1, 150);
-							motor_set_rpm(MOTOR_3, 1, 150);
+							motor_set_rpm(MOTOR_5, 0, motor_speed);
+							motor_set_rpm(MOTOR_1, 0, motor_speed);
+							motor_set_rpm(MOTOR_7, 1, motor_speed);
+							motor_set_rpm(MOTOR_3, 1, motor_speed);
 						}
 
 						motor_soft_start();
@@ -454,7 +454,7 @@ int main(void)
 				if(selected_motor < MOTOR_COUNT)
 				{
 					motor_microstep(selected_motor, selected_dir,  50 * MOTOR_MICROSTEP_CONFIG, 100);
-					delay_us(motor_speed);
+					delay_us(320);
 				}
 				break;
 			case 'y':
@@ -502,13 +502,21 @@ int main(void)
 					motor_one_step(selected_motor, selected_dir);
 				break;
 			case 'n':
-				puts("Increase speed with 10p! \n\r");
-				if(motor_speed > MOTOR_MICROSTEP_WAIT_US)
-					motor_speed -= 10;
+				
+				if(motor_speed <= 140)
+				{
+					motor_speed += 10;
+					printf("Increase speed with 10p! -> %d \n\r", motor_speed);
+				}
 				break;
 			case 'm':
-				puts("Decrease speed with 10p! \n\r");
-				motor_speed += 10;
+				
+				if(motor_speed >= 100)
+				{
+					motor_speed -= 10;
+					printf("Decrease speed with 10p -> %d! \n\r", motor_speed);
+				}
+				
 				break;
 			case 'w':
 				/* Start the counter. */
@@ -537,7 +545,7 @@ int main(void)
 				for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
 				{
 					if(motor_get_status(i) == STATE_MOTOR_OK)
-						motor_set_power(i, 0.8, 0xFA);
+						motor_set_power(i, 1.2, 0xFA);
 				}
 			break;
 			case 'k':

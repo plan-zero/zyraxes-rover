@@ -15,13 +15,13 @@ const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP
 
 const float startup_angle[MOTOR_COUNT] = 
 {
-    94.24,
+    100.0,
     0,
-    121.2,
+    297.68,
     0,
-    4,
+    315.9,
     0,
-    130.16,
+    128.32,
     0
 };
 
