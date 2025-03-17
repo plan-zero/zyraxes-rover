@@ -32,7 +32,7 @@ set(SPI_DEMO_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/../drivers/spi/spi_driver.c
     ${CMAKE_SOURCE_DIR}/spi_demo.c
 )
-avr_add_executable(spi_demo ${SPI_DEMO_SOURCE_FILES})
+#avr_add_executable(spi_demo ${SPI_DEMO_SOURCE_FILES})
 
 # Basic stepper motor code (for wiring checking)
 
@@ -40,6 +40,12 @@ set(MOTOR_DEMO_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/stepper_demo.c
     ${CMAKE_SOURCE_DIR}/sin_lut_microstep_16.c
 )
+set(MOTOR_DEMOV2_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/stepper_v2_demo.c
+)
+
 avr_add_executable(stepper_demo ${MOTOR_DEMO_SOURCE_FILES})
+avr_add_executable(stepper_v2_demo ${MOTOR_DEMOV2_SOURCE_FILES})
+
 
 
