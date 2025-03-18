@@ -57,7 +57,10 @@
  /** Internal Address */
  #define VIRTUALMEM_ADDR      0x0
  /** Speed of TWI */
- #define TWIM_MASTER_SPEED    TWI_STD_MODE_SPEED
+ /*400kbs*/
+ #define TWIM_MASTER_SPEED    TWI_FAST_MODE_SPEED 
+ /*100kbs*/
+ // #define TWIM_MASTER_SPEED TWI_STD_MODE_SPEED
  /** TWIM Interrupt Handler */
  #define EXAMPLE_TWIM_Handler TWIM3_Handler
  
