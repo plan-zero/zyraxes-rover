@@ -41,7 +41,6 @@ ISR(TWI_vect){
 		
 		// save the received byte inside data 
 		data = TWDR;
-		
 		// check wether an address has already been transmitted or not
 		if(buffer_address == 0xFF){
 			
@@ -51,7 +50,7 @@ ISR(TWI_vect){
 			TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN); 
 		}
 		else{ // if a databyte has already been received
-			
+			twi_rx_status = TWI_SLAVE_RX_PENDING;
 			// store the data at the current address
 			rxbuffer[buffer_address] = data;
 			
@@ -70,7 +69,7 @@ ISR(TWI_vect){
 		}
 	}
 	else if( ((TWSR & 0xF8) == TW_ST_DATA_ACK) || ((TWSR & 0xF8) == TW_ST_SLA_ACK) ){ // device has been addressed to be a transmitter
-		
+		twi_tx_status = TWI_SLAVE_TX_PENDING;
 		// copy data from TWDR to the temporary memory
 		data = TWDR;
 		
@@ -95,8 +94,22 @@ ISR(TWI_vect){
 		}
 		
 	}
+	else if((TWSR & 0xF8) == TW_ST_DATA_NACK)
+	{
+		twi_tx_status = TWI_SLAVE_TX_DONE;
+		TWCR |= (1<<TWIE) | (1<<TWEA) | (1<<TWEN);
+	} 
+	else if((TWSR & 0xF8) ==TW_SR_STOP)
+	{
+		if(twi_rx_status == TWI_SLAVE_RX_PENDING)
+			twi_rx_status = TWI_SLAVE_RX_DONE;
+		TWCR |= (1<<TWIE) | (1<<TWEA) | (1<<TWEN);
+	}
 	else{
 		// if none of the above apply prepare TWI to be addressed again
+		//probably the transfer was not succesfull and app should discard the data
+		twi_rx_status = TWI_SLAVE_TRANSFER_ERROR;
+		twi_tx_status = TWI_SLAVE_TRANSFER_ERROR;
 		TWCR |= (1<<TWIE) | (1<<TWEA) | (1<<TWEN);
 	} 
 }
