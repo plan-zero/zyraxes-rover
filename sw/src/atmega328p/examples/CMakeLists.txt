@@ -22,6 +22,14 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/../../../cmake/generic-avr-gcc.cma
 
 project(examples_atmega328p)
 
+set(TWI_DEMO_HEADER_INC
+    ${CMAKE_SOURCE_DIR}/../drivers/uart
+    ${CMAKE_SOURCE_DIR}/../drivers/interrupts
+    ${CMAKE_SOURCE_DIR}/../drivers/twi_slave
+)
+include_directories(${TWI_DEMO_HEADER_INC})
+
+
 
 # Basic stepper motor code (for wiring checking)
 
@@ -29,6 +37,14 @@ set(MOTOR_DEMO_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/stepper_demo.c
 )
 
+set(TWI_DEMO_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/twi_example.c
+    ${CMAKE_SOURCE_DIR}/../drivers/uart/uart.c
+    ${CMAKE_SOURCE_DIR}/../drivers/twi_slave/twi.c
+)
+
+
 avr_add_executable(stepper_demo ${MOTOR_DEMO_SOURCE_FILES})
+avr_add_executable(twi_demo ${TWI_DEMO_SOURCE_FILES})
 
 
