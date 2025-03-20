@@ -1,6 +1,8 @@
 #ifndef FIRMWARE_HW_H
 #define FIRMWARE_HW_H
 
+#include <avr/io.h>
+
 /*MCU working frequency*/
 #ifdef F_CPU
 #undef F_CPU
@@ -31,5 +33,13 @@
 #define MICROSTEP_DDR      DDRD
 
 
+#define firmware_hw328p_set_pwm_0(x) OCR0A = (uint8_t)x
+void firmware_hw328p_timer_init();
+//takes the time in ms seconds
+int firmware_hw328p_timer_start_A(uint16_t cmp_match);
+//takes the time in us seconds
+int firmware_hw328p_timer_start_B(uint16_t cmp_match);
+void firmware_hw328p_timer_stop_A();
+void firmware_hw328p_timer_stop_B();
 
 #endif /*FIRMWARE_HW_H*/

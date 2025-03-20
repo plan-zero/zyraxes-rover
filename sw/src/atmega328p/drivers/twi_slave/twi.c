@@ -4,10 +4,6 @@
 
 #include "twi.h"
 
-#define LED_PIN     PIND6
-#define LED_DDR     DDRD
-#define LED_PORT    PORTD
-
 
 void I2C_init(uint8_t address){
 	// load address into TWI address register
