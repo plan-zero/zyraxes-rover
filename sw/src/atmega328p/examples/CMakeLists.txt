@@ -22,12 +22,13 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/../../../cmake/generic-avr-gcc.cma
 
 project(examples_atmega328p)
 
-set(TWI_DEMO_HEADER_INC
+set(DEMO_HEADER_INC
     ${CMAKE_SOURCE_DIR}/../drivers/uart
     ${CMAKE_SOURCE_DIR}/../drivers/interrupts
     ${CMAKE_SOURCE_DIR}/../drivers/twi_slave
+    ${CMAKE_SOURCE_DIR}/../drivers/spi
 )
-include_directories(${TWI_DEMO_HEADER_INC})
+include_directories(${DEMO_HEADER_INC})
 
 
 
@@ -43,8 +44,15 @@ set(TWI_DEMO_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/../drivers/twi_slave/twi.c
 )
 
+SET(SPI_EXAMPLE_SOURCE_FILES 
+    ${CMAKE_SOURCE_DIR}/spi_example.c
+    ${CMAKE_SOURCE_DIR}/../drivers/uart/uart.c
+    ${CMAKE_SOURCE_DIR}/../drivers/spi/spi.c
+)
+
 
 avr_add_executable(stepper_demo ${MOTOR_DEMO_SOURCE_FILES})
 avr_add_executable(twi_demo ${TWI_DEMO_SOURCE_FILES})
+avr_add_executable(spi_demo ${SPI_EXAMPLE_SOURCE_FILES})
 
 
