@@ -40,6 +40,16 @@ ISR(TIMER2_COMPA_vect)
 #define TWI_MOTOR_DATA_SIZE 0x5
 #define TWI_SENSOR_DATA_SIZE 0x7
 
+typedef enum{
+    CMD_MOTOR_STEP_CW = 0x1,
+    CMD_MOTOR_STEP_CCW = 0x2,
+    CMD_MOTOR_RUN_CW = 0x4,
+    CMD_MOTOR_RUN_CCW = 0x5,
+    CMD_MOTOR_STOP = 0x6,
+    CMD_MOTOR_POWEROFF = 0x7,
+    CMD_MOTOR_SYNC = 0x8
+}MasterCMD;
+
 enum{
     TWI_RX_ADDR_CMD = 0,
     TWI_RX_ADDR_STEPS = 1,
@@ -127,6 +137,8 @@ int main()
     sei();
     uint16_t steps_to_do = 0;
     uint16_t step_wait = 0;
+    uint8_t free_running = 0;
+    uint8_t invalid_cmd = 0;
     unsigned char print_msg[10];
 
     DDRB |= 1 << PINB2;
@@ -151,11 +163,63 @@ int main()
             twi_rx_status = TWI_SLAVE_READY;
             sei();
 
+            if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CW)
+            {
+                SLP_PORT |= (1 << SLP_PIN);
+                DIR_PORT |= 1 << DIR_PIN;
+                free_running = 0;
+                invalid_cmd = 0;
+            }
+            else if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CCW)
+            {
+                SLP_PORT |= (1 << SLP_PIN);
+                DIR_PORT &= ~(1 << DIR_PIN);
+                free_running = 0;
+                invalid_cmd = 0;
+            }
+            else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CW)
+            {
+                SLP_PORT |= (1 << SLP_PIN);
+                DIR_PORT |= 1 << DIR_PIN;
+                free_running = 1;
+                invalid_cmd = 0;
+            }
+            else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CCW)
+            {
+                SLP_PORT |= (1 << SLP_PIN);
+                DIR_PORT &= ~(1 << DIR_PIN);
+                free_running = 1;
+                invalid_cmd = 0;
+            }
+            else if(twi_data.motor_data.cmd == CMD_MOTOR_STOP)
+            {
+                SLP_PORT |= (1 << SLP_PIN);
+                free_running = 0;
+                steps_to_do = 0;
+                firmware_hw328p_timer_stop_B();
+                
+                invalid_cmd = 0;
+            }
+            else if(twi_data.motor_data.cmd == CMD_MOTOR_POWEROFF)
+            {
+                steps_to_do = 0;
+                free_running = 0;
+                firmware_hw328p_timer_stop_B();
+                SLP_PORT &= ~(1 << SLP_PIN);
+                invalid_cmd = 0;
+            }
+            else
+            {
+                invalid_cmd = 1;
+            }
             
-            steps_to_do = twi_data.motor_data.steps;
-            //set RPM
-            step_wait = (RPM_CONST / (uint16_t)twi_data.motor_data.rpm);
-            firmware_hw328p_timer_start_B((uint8_t)step_wait);
+            if(!invalid_cmd)
+            {
+                steps_to_do = twi_data.motor_data.steps;
+                step_wait = (RPM_CONST / (uint16_t)twi_data.motor_data.rpm);
+                firmware_hw328p_timer_start_B((uint8_t)step_wait);
+            }
+                
         }
 
         if(twi_tx_status == TWI_SLAVE_TX_DONE)
@@ -189,7 +253,8 @@ int main()
                 STEP_PORT |= 1 << STEP_PIN;
                 _delay_us(5);
                 STEP_PORT &= ~(1 << STEP_PIN);
-                steps_to_do--;
+                if(!free_running)
+                    steps_to_do--;
             }
             else
             {

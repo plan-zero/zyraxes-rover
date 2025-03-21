@@ -522,8 +522,8 @@ int main(void)
 			break;
 			case '9':
 				//motor TWI test
-				/*set CMDs*/
-				write_data[0] = 0;
+				/*set CMDs motor CW*/
+				write_data[0] = 2;
 				/*Set 12800 microteps = 2 full rotations*/
 				write_data[1] = 50;
 				write_data[2] = 0;
