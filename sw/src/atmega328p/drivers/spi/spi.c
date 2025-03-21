@@ -5,7 +5,12 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 
-
+#define SCK  PB5
+#define MISO PB4
+#define MOSI PB3
+#define SS   PB2
+#define SPI_DDR  DDRB
+#define SPI_PORT PORTB
 
 
 void spi_master_init(void)

@@ -70,14 +70,6 @@ static inline int _motor_read_raw()
     uint16_t angleTemp;
     uint8_t b1 = 0, b2 = 0;
 
-	//SPI_PORT &= ~(1 << SS); // Select slave (active low)
-   // _delay_us(1);
-   // b1 = spi_rx(0xFF);
-   // b2 = spi_rx(0xFF);
-	//_delay_us(1);
-   // SPI_PORT |= (1 << SS); // Deselect slave
-   	
-    //angleTemp = (((b1 << 8) | b2) );
 	angleTemp = spi_rx_16(0xFFFF);
 
     if(angleTemp & (1 << 14))
@@ -93,11 +85,18 @@ static inline int _motor_read_raw()
 int main()
 {
 
+	/*Early initialization of CS as it is an input at startup, reading 0 logic*/
+	/*this seems to affect the sensor comunication as there is no pullup resistor*/
+	DDRB |= 1 << PB2;
+	PORTB |= 1 << PB2;
+
+	
     uart_init(UART_115200BAUD, UART_16384MHZ, UART_PARITY_NONE);
     _delay_ms(1000);
+	spi_master_init();
     uart_printString("SPI magnetic sensor atmega328p example",1);
 
-    spi_master_init();
+    
    
 
     magnetic_sensor_diag();
