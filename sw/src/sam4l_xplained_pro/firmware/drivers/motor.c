@@ -15,13 +15,13 @@ const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP
 
 const float startup_angle[MOTOR_COUNT] = 
 {
-    100.0,
+    211.0,
     0,
-    297.68,
+    316.68,
     0,
-    315.9,
+    57.9,
     0,
-    128.32,
+    120.32,
     0
 };
 
@@ -80,14 +80,14 @@ static inline void _motor_diag(uint8_t PCs)
   	puts("\n\r");
   	delay_ms(1);
 
-	spi_sync_transfer(0x40, SPI_CHIP_PCS_0, 0);
-	spi_sync_transfer(0x01, SPI_CHIP_PCS_0, 1);
+	spi_sync_transfer(0x40, PCs, 0);
+	spi_sync_transfer(0x01, PCs, 1);
 
 
   	delay_ms(1);
 
-	b1 = spi_sync_transfer(0xC0, SPI_CHIP_PCS_0 ,0);
-	b2 = spi_sync_transfer(0x00, SPI_CHIP_PCS_0 ,1);
+	b1 = spi_sync_transfer(0xC0, PCs ,0);
+	b2 = spi_sync_transfer(0x00, PCs ,1);
 	data = ((b1 << 8) | b2);
 
   	puts("motor_diag: Check ERRFL register ...  \n\r\r");
@@ -225,13 +225,19 @@ static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t ste
 
 static inline int _motor_read_raw(uint8_t PCs)
 {
-    long angleTemp;
+    uint16_t angleTemp;
     uint8_t b1 = 0, b2 = 0;
 
     b1 = spi_sync_transfer(0xFF, PCs, 0);
     b2 = spi_sync_transfer(0xFF, PCs, 1);
 
-    angleTemp = (((b1 << 8) | b2) & 0B0011111111111111);
+    angleTemp = (((b1 << 8) | b2) );
+
+    if(angleTemp & (1 << 14))
+        printf("Angle error! \n\r");
+
+    angleTemp &= 0B0011111111111111;
+
 
     return angleTemp >> MAGNETIC_REDUCE_RESOLUTION;
 }

@@ -545,7 +545,7 @@ int main(void)
 				for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
 				{
 					if(motor_get_status(i) == STATE_MOTOR_OK)
-						motor_set_power(i, 1.2, 0xFA);
+						motor_set_power(i, 0.9, 0xFA);
 				}
 			break;
 			case 'k':
