@@ -58,6 +58,7 @@ CSRCS = \
        common/services/clock/sam4l/sysclk.c               \
        common/services/serial/usart_serial.c              \
        common/services/delay/sam/cycle_counter.c          \
+       common/services/sleepmgr/sam4l/sleepmgr.c          \
        common/utils/interrupt/interrupt_sam_nvic.c        \
        common/utils/stdio/read.c                          \
        common/utils/stdio/write.c                         \
@@ -68,6 +69,7 @@ CSRCS = \
        sam/drivers/spi/spi.c                              \
        sam/drivers/usart/usart.c                          \
        sam/drivers/wdt/wdt_sam4l.c                        \
+       sam/drivers/twim/twim.c                            \
        sam/utils/cmsis/sam4l/source/templates/exceptions.c \
        sam/utils/cmsis/sam4l/source/templates/gcc/startup_sam4l.c \
        sam/utils/cmsis/sam4l/source/templates/system_sam4l.c \
@@ -88,6 +90,7 @@ INC_PATH = \
        common/services/serial                             \
        common/services/serial/sam_uart                    \
        common/services/delay                              \
+       common/services/sleepmgr                           \
        common/utils                                       \
        common/utils/stdio/stdio_serial                    \
        sam/boards                                         \
@@ -98,6 +101,7 @@ INC_PATH = \
        sam/drivers/spi                                    \
        sam/drivers/usart                                  \
        sam/drivers/wdt                                    \
+       sam/drivers/twim                                   \
        sam/utils                                          \
        sam/utils/cmsis/sam4l/include                      \
        sam/utils/cmsis/sam4l/source/templates             \

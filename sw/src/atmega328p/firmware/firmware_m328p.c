@@ -177,7 +177,7 @@ int main()
 
                 //debug
                 //itoa(twi_data.sensor_data.raw_value,print_msg,10);
-               // uart_printString(print_msg,1);
+                //uart_printString(print_msg,1);
                 timer_sensor_count = 0;
             }
         }

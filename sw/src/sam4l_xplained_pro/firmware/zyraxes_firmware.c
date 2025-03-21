@@ -14,6 +14,8 @@
 #include "zyra_spi.h"
 #include "motor.h"
 #include "motor_calibration.h"
+#include "conf_twi_example.h"
+#include <twim.h>
 
 
 /// @cond 0
@@ -69,6 +71,8 @@ static void display_menu(void)
 		 "  b: Break all motors \n\r"
 		 "  k: Dev SPI tryout \n\r"
 		 "  x: Start commands\n\r"
+		 "  9: TWI motor test\n\r"
+		 "  8: TWI sensor test\n\r"
 		 "  h: Display this menu again\n\r\r");
 
 }
@@ -76,6 +80,8 @@ static void display_menu(void)
 volatile int do_motor_task = 0;
 volatile int count = 0;
 volatile int timer_timeout = 0;
+
+
 
 void TC00_Handler(void)
 {
@@ -103,6 +109,78 @@ void TC10_Handler(void)
 
 	/* Avoid compiler warning */
 	UNUSED(ul_dummy);
+}
+
+#define TWI_TX_PACKAGE_LENGTH 5
+#define TWI_RX_PACKAGE_LENGTH 7
+uint8_t write_data[TWI_TX_PACKAGE_LENGTH] = {0, 0, 0, 0, 0};
+uint8_t read_data[TWI_RX_PACKAGE_LENGTH] = {0, 0, 0, 0, 0, 0, 0};
+twi_package_t packet_tx, packet_rx;
+uint32_t cpu_speed = 0;
+
+static status_code_t init_twi(void)
+{
+	/* Set TWIM options */
+	cpu_speed = sysclk_get_peripheral_bus_hz(EXAMPLE_TWIM);
+	struct twim_config opts = {
+		.twim_clk = cpu_speed,
+		.speed = TWIM_MASTER_SPEED,
+		.hsmode_speed = 0,
+		.data_setup_cycles = 0,
+		.hsmode_data_setup_cycles = 0,
+		.smbus = false,
+		.clock_slew_limit = 0,
+		.clock_drive_strength_low = 0,
+		.data_slew_limit = 0,
+		.data_drive_strength_low = 0,
+		.hs_clock_slew_limit = 0,
+		.hs_clock_drive_strength_high = 0,
+		.hs_clock_drive_strength_low = 0,
+		.hs_data_slew_limit = 0,
+		.hs_data_drive_strength_low = 0,
+	};
+	/* Initialize the TWIM Module */
+	twim_set_callback(EXAMPLE_TWIM, 0, twim_default_callback, 1);
+
+	return twim_set_config(EXAMPLE_TWIM, &opts);
+}
+
+static status_code_t twi_write_package(uint8_t address)
+{
+	/* TWI chip address to communicate with */
+	packet_tx.chip = TARGET_ADDRESS;
+	packet_tx.ten_bit = false;
+	/* TWI address/commands to issue to the other chip (node) */
+	packet_tx.addr[0] = address;
+	packet_tx.addr[1] = 0;
+	/* Length of the TWI data address segment (1-3 bytes) */
+	packet_tx.addr_length = 1;
+	/* Where to find the data to be written */
+	packet_tx.buffer = (void *) write_data;
+	/* How many bytes do we want to write */
+	packet_tx.length = TWI_TX_PACKAGE_LENGTH;
+	printf("Writing data to TARGET\r\n");
+	/* Write data to TARGET */
+	return twi_master_write(EXAMPLE_TWIM, &packet_tx);
+}
+
+static status_code_t twi_read_package(uint8_t address)
+{
+	/* TWI chip address to communicate with */
+	packet_rx.chip = TARGET_ADDRESS;
+	packet_rx.ten_bit = false;
+	/* Length of the TWI data address segment (1-3 bytes) */
+	packet_rx.addr_length = 1;
+	/* How many bytes do we want to write */
+	packet_rx.length = TWI_RX_PACKAGE_LENGTH;
+	/* TWI address/commands to issue to the other chip (node) */
+	packet_rx.addr[0] = address;
+	packet_rx.addr[1] = 0;
+	/* Where to find the data to be written */
+	packet_rx.buffer = read_data;
+	printf("Reading data from TARGET\r\n");
+	/* Read data from TARGET */
+	return twi_master_read(EXAMPLE_TWIM, &packet_rx);
 }
 
 /**
@@ -204,6 +282,7 @@ int main(void)
 
 
 	spi_master_initialize();
+	init_twi();
 
 	//Init LED0
 	ioport_set_pin_dir(LED_0_PIN, IOPORT_DIR_OUTPUT);
@@ -433,6 +512,29 @@ int main(void)
 					selected_motor = ati_cmd;
 				else
 					printf("MOTOR_%d offline/error! \n\r", ati_cmd);
+				break;
+			case '8':
+				twi_read_package(0);
+				int raw = read_data[0] << 8 | read_data[1];
+				printf("Raw angle: %d \n\r", raw);
+				
+
+			break;
+			case '9':
+				//motor TWI test
+				/*set CMDs*/
+				write_data[0] = 0;
+				/*Set 12800 microteps = 2 full rotations*/
+				write_data[1] = 50;
+				write_data[2] = 0;
+				/*set rpm 150*/
+				write_data[3] = 150;
+				/*reserved for now*/
+				write_data[4] = 0;
+
+				twi_write_package(0);
+
+
 				break;
 			case 'h':
 				display_menu();

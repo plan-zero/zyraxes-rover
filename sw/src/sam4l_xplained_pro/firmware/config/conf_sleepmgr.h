@@ -1,9 +1,9 @@
 /**
  * \file
  *
- * \brief Board configuration.
+ * \brief Chip-specific sleep manager configuration
  *
- * Copyright (c) 2011-2018 Microchip Technology Inc. and its subsidiaries.
+ * Copyright (c) 2014-2018 Microchip Technology Inc. and its subsidiaries.
  *
  * \asf_license_start
  *
@@ -33,30 +33,7 @@
 /*
  * Support and FAQ: visit <a href="https://www.microchip.com/support/">Microchip Support</a>
  */
+#ifndef CONF_SLEEPMGR_INCLUDED
+#define CONF_SLEEPMGR_INCLUDED
 
-#ifndef CONF_BOARD_H_INCLUDED
-#define CONF_BOARD_H_INCLUDED
-
-/** Enable Com Port. */
-#define CONF_BOARD_COM_PORT
-
-/** SPI MACRO definition */
-#define CONF_BOARD_SPI
-
-/** SPI slave select MACRO definition */
-#define CONF_BOARD_SPI_NPCS0
-#define CONF_BOARD_SPI_NPCS1
-#define CONF_BOARD_SPI_NPCS2
-
-/** Spi Hw ID . */
-#define SPI_ID          ID_SPI
-
-/** SPI base address for SPI master mode*/
-#define SPI_MASTER_BASE      SPI
-/** SPI base address for SPI slave mode, (on different board) */
-#define SPI_SLAVE_BASE       SPI
-
-/** Enable TWIM3 pins. */
-#define CONF_BOARD_TWIMS3
-
-#endif /* CONF_BOARD_H_INCLUDED */
+#endif /* CONF_SLEEPMGR_INCLUDED */

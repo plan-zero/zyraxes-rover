@@ -1,9 +1,9 @@
 /**
  * \file
  *
- * \brief Board configuration.
+ * \brief Example configuration header file.
  *
- * Copyright (c) 2011-2018 Microchip Technology Inc. and its subsidiaries.
+ * Copyright (c) 2014-2018 Microchip Technology Inc. and its subsidiaries.
  *
  * \asf_license_start
  *
@@ -30,33 +30,38 @@
  * \asf_license_stop
  *
  */
+
+/**
+ * \defgroup twim_master_example_pin_defs
+ *   - <b> Board  --  EEPROM</b>
+ *   - TWIMS3 TWD(PB14,EXT2/PIN11)  --  SDA
+ *   - TWIMS3 TWCK(PB15,EXT2/PIN12)  --  SCL
+ *   - VCC  --  VCC
+ *   - GND  --  GND
+ */
 /*
  * Support and FAQ: visit <a href="https://www.microchip.com/support/">Microchip Support</a>
  */
 
-#ifndef CONF_BOARD_H_INCLUDED
-#define CONF_BOARD_H_INCLUDED
-
-/** Enable Com Port. */
-#define CONF_BOARD_COM_PORT
-
-/** SPI MACRO definition */
-#define CONF_BOARD_SPI
-
-/** SPI slave select MACRO definition */
-#define CONF_BOARD_SPI_NPCS0
-#define CONF_BOARD_SPI_NPCS1
-#define CONF_BOARD_SPI_NPCS2
-
-/** Spi Hw ID . */
-#define SPI_ID          ID_SPI
-
-/** SPI base address for SPI master mode*/
-#define SPI_MASTER_BASE      SPI
-/** SPI base address for SPI slave mode, (on different board) */
-#define SPI_SLAVE_BASE       SPI
-
-/** Enable TWIM3 pins. */
-#define CONF_BOARD_TWIMS3
-
-#endif /* CONF_BOARD_H_INCLUDED */
+ #ifndef CONF_EXAMPLE_H_INCLUDED
+ #define CONF_EXAMPLE_H_INCLUDED
+ 
+ /** TWIM Interrupt Number */
+ #define EXAMPLE_TWIM_IRQn    TWIM3_IRQn
+ /** TWIM Module Used */
+ #define EXAMPLE_TWIM         TWIM3
+ /** Target's TWI address */
+ #define TARGET_ADDRESS       0x70
+ /** Internal Address length */
+ #define TARGET_ADDR_LGT      1
+ /** Internal Address */
+ #define VIRTUALMEM_ADDR      0x0
+ /** Speed of TWI */
+ /*400kbs*/
+ #define TWIM_MASTER_SPEED    TWI_FAST_MODE_SPEED 
+ /*100kbs*/
+ // #define TWIM_MASTER_SPEED TWI_STD_MODE_SPEED
+ /** TWIM Interrupt Handler */
+ #define EXAMPLE_TWIM_Handler TWIM3_Handler
+ 
+ #endif /* CONF_EXAMPLE_H_INCLUDED */
