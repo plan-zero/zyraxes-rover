@@ -127,10 +127,11 @@ int main()
     sei();
     uint16_t steps_to_do = 0;
     uint16_t step_wait = 0;
-    uint16_t magnetic_sensor_value = 0;
     unsigned char print_msg[10];
 
     DDRB |= 1 << PINB2;
+
+    twi_tx_status = TWI_SLAVE_READY;
 
     while(1)
     {
@@ -155,6 +156,30 @@ int main()
             //set RPM
             step_wait = (RPM_CONST / (uint16_t)twi_data.motor_data.rpm);
             firmware_hw328p_timer_start_B((uint8_t)step_wait);
+        }
+
+        if(twi_tx_status == TWI_SLAVE_TX_DONE)
+        {
+            //do something once data is out, move it to ready to update the rxbuffer
+            twi_tx_status = TWI_SLAVE_READY;
+        }
+        else if(twi_tx_status == TWI_SLAVE_READY)
+        {
+            //read every 10 ms the sensor data
+            if(timer_sensor_count >= 10)
+            {
+                cli();
+                twi_data.sensor_data.raw_value = magnetic_sensor_read();
+                //update txbuffer
+                txbuffer[TWI_TX_ADDR_SENSOR_RAW] = (twi_data.sensor_data.raw_value & 0xFF00) >> 8;
+                txbuffer[TWI_TX_ADDR_SENSOR_RAW+1] = twi_data.sensor_data.raw_value & 0x00FF;
+                sei();
+
+                //debug
+                //itoa(twi_data.sensor_data.raw_value,print_msg,10);
+               // uart_printString(print_msg,1);
+                timer_sensor_count = 0;
+            }
         }
 
         if(timer_timer_trigger)
@@ -185,14 +210,6 @@ int main()
             else if(led_pwm == 5)
                 led_pwm_dir = 1;
            timer_led_count = 0;
-        }
-
-        if(timer_sensor_count >= 100)
-        {
-            magnetic_sensor_value = magnetic_sensor_read();
-          //  itoa(magnetic_sensor_value,print_msg,10);
-         //   uart_printString(print_msg,1);
-            timer_sensor_count = 0;
         }
 
     }
