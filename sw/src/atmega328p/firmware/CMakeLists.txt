@@ -37,6 +37,7 @@ include_directories(${FIRMWARE_M328P_INC})
 set(FIRMWARE_M328P_SRC
     ${CMAKE_SOURCE_DIR}/firmware_m328p.c
     ${CMAKE_SOURCE_DIR}/firmware_hw.c
+    ${CMAKE_SOURCE_DIR}/magnetic_sensor.c
     ${CMAKE_SOURCE_DIR}/../drivers/uart/uart.c
     ${CMAKE_SOURCE_DIR}/../drivers/twi_slave/twi.c
     ${CMAKE_SOURCE_DIR}/../drivers/spi/spi.c

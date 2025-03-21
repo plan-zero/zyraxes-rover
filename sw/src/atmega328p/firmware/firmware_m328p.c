@@ -5,6 +5,9 @@
 #include <avr/interrupt.h>
 #include "stdint.h"
 #include <string.h>
+#include "magnetic_sensor.h"
+#include "spi.h"
+#include "stdlib.h"
 
 //this is calculated based on the formula
 //motor_step_us = MINUTE_US / (RPM * MOTOR_SPR * MICROSTEP_CONFIG)
@@ -13,18 +16,20 @@
 #define TIMER_US_MIN 30
 
 volatile int timer_timer_trigger = 0;
-volatile int timer_app_count = 1;
+volatile int timer_led_count = 0;
+volatile int timer_sensor_count = 0;
 ISR(TIMER1_COMPA_vect)
 {
     
-    timer_app_count++;
+    timer_led_count++;
+    timer_sensor_count++;
     
 }
 
 
 ISR(TIMER2_COMPA_vect)
 {
-    PORTB ^= 1 << PINB2;
+    
     timer_timer_trigger = 1;
 }
 
@@ -33,17 +38,41 @@ ISR(TIMER2_COMPA_vect)
 //TODO: read this from eprom
 #define TWI_SLAVE_ADDRESS   0x70
 #define TWI_MOTOR_DATA_SIZE 0x5
+#define TWI_SENSOR_DATA_SIZE 0x7
+
+enum{
+    TWI_RX_ADDR_CMD = 0,
+    TWI_RX_ADDR_STEPS = 1,
+    TWI_RX_ADDR_RPM = 3,
+    TWI_RX_ADDR_CMD_DIAG = 4
+};
+enum{
+    TWI_TX_ADDR_SENSOR_RAW = 0,
+    TWI_TX_ADDR_SENSOR_DIAG1 = 2,
+    TWI_TX_ADDR_SENSOR_DIAG2 = 4,
+    TWI_TX_ADDR_MOTOR_STATUS = 5
+};
 
 typedef struct{
     union{
         struct{
             uint8_t cmd;
-            uint8_t steps[2];
+            uint16_t steps;
             uint8_t rpm;
             uint8_t status;
         };
         uint8_t data[TWI_MOTOR_DATA_SIZE];
-    };
+    }motor_data;
+    union
+    {
+        struct{
+            uint16_t raw_value;
+            uint16_t diag1;
+            uint16_t diag2;
+            uint8_t cmd;
+        };
+        uint8_t sensor_data[TWI_SENSOR_DATA_SIZE];
+    }sensor_data;
     uint8_t transfer_status;
 }twi_data_t;
 
@@ -55,7 +84,10 @@ volatile uint8_t twi_tx_status = 0;
 
 int main()
 {
-
+    /*Early initialization of CS as it is an input at startup, reading 0 logic*/
+	/*this seems to affect the sensor comunication as there is no pullup resistor*/
+	DDRB |= 1 << PB2;
+	PORTB |= 1 << PB2;
     /*Init uart for debugging/coms*/
     uart_init(UART_115200BAUD, UART_16384MHZ, UART_PARITY_NONE);
     /*Print initial message - print slave address as well*/
@@ -65,6 +97,8 @@ int main()
     uartNewLine();
     /*Init TWI as slave with the give address*/
     I2C_init(TWI_SLAVE_ADDRESS);
+    /*Init SPI master*/
+    spi_master_init();
 
     /*Initialize the motor driver, 32microsteps, enable SLP*/
     MICROSTEP_DDR |= MICROSTEP_32;
@@ -86,31 +120,40 @@ int main()
     firmware_hw328p_set_pwm_0(0);
     //set timer at 100ms
     firmware_hw328p_timer_start_A(1);
-    //firmware_hw328p_timer_start_B(200);
+    
+    magnetic_sensor_diag();
 
     /*enable global interrupts*/
     sei();
     uint16_t steps_to_do = 0;
     uint16_t step_wait = 0;
+    uint16_t magnetic_sensor_value = 0;
+    unsigned char print_msg[10];
 
     DDRB |= 1 << PINB2;
 
     while(1)
     {
         //getting data
+        //get all rx data
         if(twi_rx_status == TWI_SLAVE_RX_DONE)
         {
             //copy buffer 
             cli();
-            twi_data.data[0] = rxbuffer[0];
-            twi_data.data[1] = rxbuffer[1];
-            twi_data.data[2] = rxbuffer[2];
+            twi_data.motor_data.cmd = rxbuffer[TWI_RX_ADDR_CMD];
+            twi_data.motor_data.steps = rxbuffer[TWI_RX_ADDR_STEPS] << 8 | rxbuffer[TWI_RX_ADDR_STEPS+1];
+            twi_data.motor_data.rpm = rxbuffer[TWI_RX_ADDR_RPM];
+            twi_data.sensor_data.cmd = txbuffer[TWI_RX_ADDR_CMD_DIAG];
+            //clear rx buffer
+            for(int i = 0;i < 10;i++)
+                rxbuffer[i] = 0;
             twi_rx_status = TWI_SLAVE_READY;
             sei();
 
-            steps_to_do = twi_data.steps[0] << 8 | twi_data.steps[1];
+            
+            steps_to_do = twi_data.motor_data.steps;
             //set RPM
-            step_wait = (RPM_CONST / (uint16_t)300);
+            step_wait = (RPM_CONST / (uint16_t)twi_data.motor_data.rpm);
             firmware_hw328p_timer_start_B((uint8_t)step_wait);
         }
 
@@ -132,7 +175,7 @@ int main()
         
 
 
-       if(timer_app_count >= 10)
+       if(timer_led_count >= 10)
        {
             
             firmware_hw328p_set_pwm_0((uint8_t)led_pwm);
@@ -141,7 +184,15 @@ int main()
                 led_pwm_dir = -1;
             else if(led_pwm == 5)
                 led_pwm_dir = 1;
-           timer_app_count = 0;
+           timer_led_count = 0;
+        }
+
+        if(timer_sensor_count >= 100)
+        {
+            magnetic_sensor_value = magnetic_sensor_read();
+          //  itoa(magnetic_sensor_value,print_msg,10);
+         //   uart_printString(print_msg,1);
+            timer_sensor_count = 0;
         }
 
     }
