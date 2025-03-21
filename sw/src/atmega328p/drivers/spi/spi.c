@@ -73,7 +73,7 @@ void spi_tx_16(uint16_t data)
 	while(!(SPSR & (1<<SPIF)));
 
     /*second byte*/
-	SPDR = b1;
+	SPDR = b2;
 	while(!(SPSR & (1<<SPIF)));
 
     _delay_us(1);
@@ -97,7 +97,7 @@ uint16_t spi_rx_16(uint16_t data)
     out1 = SPDR;
 
     /*second byte*/
-	SPDR = b1;
+	SPDR = b2;
 	while(!(SPSR & (1<<SPIF)));
     out2 = SPDR;
 
