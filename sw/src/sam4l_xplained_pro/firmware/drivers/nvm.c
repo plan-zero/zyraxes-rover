@@ -13,7 +13,7 @@ void store_lookup(float lookupAngle)
     return;
 
   // we've filled an entire page, write it to the flash
-  printf("Add to NVM, page no: %d, page_addr: %x \n\r",page_number , page_ptr);
+  printf("Add to NVM, page no: %d, page_addr: %p \n\r",page_number , page_ptr);
   //flash_rw_calibration(page, page_ptr);
   flashcalw_memcpy(page_ptr, page, FLASH_PAGE_SIZE, true);
 

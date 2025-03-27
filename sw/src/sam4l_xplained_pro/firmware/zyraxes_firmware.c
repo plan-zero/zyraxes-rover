@@ -339,11 +339,8 @@ int main(void)
 	int ati_cmd = 0;
 	//start with motor task enabled
 	int run_timer = 1;
-	int interrupt_us = 0;
-	int interrupt_hz = 0;
 
 	uint8_t spi_data[4];
-	int toggle = 0;
 	int process_extended = 0;
 
 	int8_t x_val = 0;
@@ -356,10 +353,8 @@ int main(void)
 	uint8_t twi_selected_chip = TARGET_ADDRESS;
 	uint8_t twi_testing_cmd = 0x1;
 
-	float angle_m0 = 0, angle_m1 = 0, angle_m2 = 0, angle_m3 = 0;
-	float fangle_m0 = 0, fangle_m1 = 0, fangle_m2 = 0, fangle_m3 = 0;
-
 	int rover_state = 0;
+	int raw = 0;
 	
 
 	tc_enable_interrupt(TC0, 0, TC_IER_CPCS);
@@ -519,7 +514,7 @@ int main(void)
 				break;
 			case '8':
 				twi_read_package(twi_selected_chip,0);
-				int raw = read_data[0] << 8 | read_data[1];
+				raw = read_data[0] << 8 | read_data[1];
 				printf("Raw angle: %d \n\r", raw);
 				
 
@@ -607,13 +602,13 @@ int main(void)
 				{
 					printf("Angle: ");
 					float angle = motor_read_angle(selected_motor);
-					char str[8];
+					char str[10];
 					snprintf(str, sizeof(str), "%f", angle);
 					printf("Angle %s \n\r",str);
 					angle = motor_get_abs(selected_motor);
 					snprintf(str, sizeof(str), "%f", angle);
 					printf("Abs %s \n\r",str);
-					int raw = motor_read_position(selected_motor);
+					raw = motor_read_position(selected_motor);
 					printf("Raw: %d \n\r", raw);
 				}
 				break;
@@ -774,7 +769,8 @@ int main(void)
 							if(uc_key == 's')
 							{
 								scanf("%c", (char *)&uc_key);
-								if(uc_key = 's')
+								//TODO: some mistake that was working before, I touched this!
+								if(uc_key == 's')
 									command_mode = 0;
 							}
 							

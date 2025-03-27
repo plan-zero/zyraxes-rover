@@ -67,14 +67,14 @@ void motor_diagnoise(uMotorID motorID);
 void motor_calibrate(uMotorID motorID);
 void motor_sync(uMotorID motorID);
 void motor_printout(uMotorID motorID);
-void motor_task();
+void motor_task(void);
 void motor_set_angle(uMotorID motorID, float angle);
 sMotorState motor_get_status(uMotorID motorID);
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM);
 void motor_set_dir(uMotorID motorID, uint8_t dir);
 void motor_set_power(uMotorID motorID, float power, unsigned char motor_config);
 float motor_get_abs(uMotorID motorID);
-void motor_soft_start();
-void motor_soft_stop();
+void motor_soft_start(void);
+void motor_soft_stop(void);
 
 #endif /*MOTOR_H*/

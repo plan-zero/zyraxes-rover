@@ -1,14 +1,11 @@
 #include "motor_calibration.h"
 #include "motor.h"
-#include "zyra_spi.h"
+#include "motor_spi.h"
+
 #include "delay.h"
 #include "nvm.h"
 #include "string.h"
 
-#define MOTOR_SYNC_CMD  0xc0
-#define MOTOR_STEP_CMD  0x40
-#define MOTOR_SETUP_CMD 0x80
-#define MOTOR_SYNC_ACK  0xAA
 
 
 const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP_CONFIG);
@@ -25,221 +22,20 @@ const float startup_angle[MOTOR_COUNT] =
     0
 };
 
+const float __attribute__((__aligned__(512))) lookup[MOTOR_COUNT][MAGNETIC_LUT_SIZE] = {
+    //Put lookup table here!
+};
+
 
 int turning_speed_red[MOTORS_TURNING_POS] = {0, 15, 30, 45, 60};
 int motors_turning_position = 0;
 
-const float __attribute__((__aligned__(512))) lookup[MOTOR_COUNT][MAGNETIC_LUT_SIZE] = {
-//Put lookup table here!
-};
-
-static inline int  _motor_sync(uMotorID motorID, uint8_t PCs);
-static inline void  _motor_diag(uint8_t PCs);
 
 sMotorInstance _motors[MOTOR_COUNT];
 
 
 static inline int mod(int xMod, int mMod) {
   return (xMod % mMod + mMod) % mMod;
-}
-
-static inline void _motor_diag(uint8_t PCs)
-{
-	long angleTemp = 0;
-	uint16_t data = 0;
-	uint8_t b1 = 0, b2 = 0;
-
-	puts("motor_diag: Checking AS5047 diagnostic and error registers ... \n\r");
-
-	spi_sync_transfer(0xFF, PCs, 0);
-	spi_sync_transfer(0xFC, PCs, 1);
-
-	delay_ms(1);
-
-	b1 = spi_sync_transfer(0xC0, PCs, 0);
-	b2 = spi_sync_transfer(0x00, PCs, 1);
-
-	data = ((b1 << 8) | b2);
-
-	puts("motor_diag: Check DIAAGC register ...  n\r\r");
-
-	angleTemp = (data & 0xFFFF);
-	printf("%ld BIN n\r", (angleTemp | 0B1110000000000000000 ));
-
-  	if (angleTemp & (1 << 14))    puts("  Error occurred  \n\r");
-
-  	if (angleTemp & (1 << 11))    puts("  MAGH - magnetic field strength too high, set if AGC = 0x00. This indicates the non-linearity error may be increased \n\r");
-
-  	if (angleTemp & (1 << 10))    puts("  MAGL - magnetic field strength too low, set if AGC = 0xFF. This indicates the output noise of the measured angle may be increased\n\r");
-
-  	if (angleTemp & (1 << 9))     puts("  COF - CORDIC overflow. This indicates the measured angle is not reliable\n\r");
-
-  	if (angleTemp & (1 << 8))     puts("  LF - offset compensation completed. At power-up, an internal offset compensation procedure is started, and this bit is set when the procedure is completed\n\r");
-
-  	if (!((angleTemp & (1 << 14)) | (angleTemp & (1 << 11)) | (angleTemp & (1 << 10)) | (angleTemp & (1 << 9))))  puts("Looks good!\n\r");
-  	puts("\n\r");
-  	delay_ms(1);
-
-	spi_sync_transfer(0x40, PCs, 0);
-	spi_sync_transfer(0x01, PCs, 1);
-
-
-  	delay_ms(1);
-
-	b1 = spi_sync_transfer(0xC0, PCs ,0);
-	b2 = spi_sync_transfer(0x00, PCs ,1);
-	data = ((b1 << 8) | b2);
-
-  	puts("motor_diag: Check ERRFL register ...  \n\r\r");
-
-
-  	angleTemp = (data & 0xFFFF);
-  	printf("%ld BIN\n\r", (angleTemp | 0B1110000000000000000 ));
-
-  	if (angleTemp & (1 << 14)) {
-    	puts("  Error occurred  \n\r");
-  	}
-  	if (angleTemp & (1 << 2)) {
-    	puts("  parity error \n\r");
-  	}
-  	if (angleTemp & (1 << 1)) {
-    	puts("  invalid register  \n\r");
-  	}
-  	if (angleTemp & (1 << 0)) {
-    	puts("  framing error  \n\r");
-  	}
-  	if (!((angleTemp & (1 << 14)) | (angleTemp & (1 << 2)) | (angleTemp & (1 << 1)) | (angleTemp & (1 << 0))))  puts("Looks good! \n\r");
-
-  	puts("\n\r");
-
-  	delay_ms(1);
-}
-
-static inline int  _motor_sync(uMotorID motorID, uint8_t PCs)
-{
-
-	uint8_t response = 0;
-    uint8_t select_slave = 0;
-    uint8_t in_data[4];
-    uint8_t data[5];
-    int tryout = 5;
-
-    data[0] = MOTOR_SYNC_CMD;
-    data[1] = 0;
-    data[2] = 0;
-    //calculate checksum
-    data[3] = data[0] + data[1] + data[2];
-    data[4] = 0xff;
-
-    spi_sync_transfer(data[0], PCs, 0);
-	in_data[0] = spi_sync_transfer(data[1], PCs, 0);
-    in_data[1] = spi_sync_transfer(data[2], PCs, 0);
-    in_data[2] = spi_sync_transfer(data[3], PCs, 0);
-    in_data[3] = spi_sync_transfer(data[4], PCs, 1);
-
-    printf("Ret: %x%x%x%x \n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
-
-    if(in_data[3] != 0xAA)
-    {
-        while(tryout--)
-        {
-            spi_sync_transfer(data[0], PCs, 0);
-            in_data[0] = spi_sync_transfer(data[1], PCs, 0);
-            in_data[1] = spi_sync_transfer(data[2], PCs, 0);
-            in_data[2] = spi_sync_transfer(data[3], PCs, 0);
-            in_data[3] = spi_sync_transfer(data[4], PCs, 1);
-
-            printf(">Ret: %x%x%x%x \n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
-
-            if(in_data[3] == 0xAA)
-            {
-                tryout = 0;
-                break;
-            }
-        }
-
-        if(in_data[3] != 0xAA)
-        {
-            printf("_motor_sync: ID: %d failed\n\r", motorID);
-            return 1;
-        }
-
-    }
-
-    return 0;
-}
-
-static inline uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t steps, uint8_t rpm)
-{
-    uint8_t in_data[4];
-	uint8_t data[5];
-    int tryout = 5;
-
-    data[0] = MOTOR_STEP_CMD | (dir << 5) | ((steps & 0x1fff) >> 8);
-    data[1] = (steps & 0xff);
-    data[2] = rpm;
-    //calculate checksum
-    data[3] = data[0] + data[1] + data[2];
-    data[4] = 0xff;
-
-    spi_sync_transfer(data[0], PCs, 0);
-	in_data[0] = spi_sync_transfer(data[1], PCs, 0);
-    in_data[1] = spi_sync_transfer(data[2], PCs, 0);
-    in_data[2] = spi_sync_transfer(data[3], PCs, 0);
-    in_data[3] = spi_sync_transfer(data[4], PCs, 0);
-    
-
-    printf("Ret: %x%x%x%x\n\r", in_data[0], in_data[1],in_data[2], in_data[3]);
-    
-    if(in_data[3] != 0x77)
-    {
-        while(tryout--)
-        {
-            spi_sync_transfer(data[0], PCs, 0);
-            in_data[0] = spi_sync_transfer(data[1], PCs, 0);
-            in_data[1] = spi_sync_transfer(data[2], PCs, 0);
-            in_data[2] = spi_sync_transfer(data[3], PCs, 0);
-            in_data[3] = spi_sync_transfer(data[4], PCs, 0);
-            
-
-            printf(">Ret: %x%x%x%x\n\r", in_data[0], in_data[1],in_data[2], in_data[3]);
-
-            if(in_data[3] == 0x77)
-            {
-                tryout = 0;
-                break;
-            }
-        }
-
-        if(in_data[3] != 0x77)
-        {
-            printf("_motor_microstep: failed\n\r");
-            return 1;
-        }
-
-    }
-    
-    return 0;
-
-}
-
-static inline int _motor_read_raw(uint8_t PCs)
-{
-    uint16_t angleTemp;
-    uint8_t b1 = 0, b2 = 0;
-
-    b1 = spi_sync_transfer(0xFF, PCs, 0);
-    b2 = spi_sync_transfer(0xFF, PCs, 1);
-
-    angleTemp = (((b1 << 8) | b2) );
-
-    if(angleTemp & (1 << 14))
-        printf("Angle error! \n\r");
-
-    angleTemp &= 0B0011111111111111;
-
-
-    return angleTemp >> MAGNETIC_REDUCE_RESOLUTION;
 }
 
 
@@ -267,7 +63,7 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
     else
     {
         _motors[motorID].state = STATE_MOTOR_OK;
-        char str[7];
+        char str[10];
         //get initial senzor data
         _motors[motorID].init_pos = _motor_read_raw(_motors[motorID].motorPCs = motorPCs);
         //get few reads to make sure there is no flush data in SPI
@@ -334,13 +130,6 @@ float motor_get_abs(uMotorID motorID)
 {
     //read angle from sensor
     float sign = -1.0;
-   // if(_motors[motorID].dir == MOTOR_FORWARD)
-   // {
-  //      sign = 1.0;   
-  //  }
-    //char str[8];
-	//snprintf(str, sizeof(str), "%f", _motors[motorID].init_angle);
-	//printf("dbg Angle %s \n\r",str);
     float abs_pos = (_motors[motorID].init_angle + ( (float)_motors[motorID].rotations * 360.0) + ( _motors[motorID].angle_zero_set) * sign) / _motors[motorID].gearbox; 
     return abs_pos;
 }
@@ -353,7 +142,6 @@ sMotorState motor_get_status(uMotorID motorID)
 void motor_microstep(uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
 {
     uint16_t ret = 0;
-    uint16_t tryout = 3;
     _motors[motorID].dir = dir;
 
     ret = _motor_micro_step(_motors[motorID].motorPCs, dir, steps, rpm);
@@ -373,7 +161,7 @@ float motor_read_angle(uMotorID motorID)
     if(STATE_MOTOR_OK != _motors[motorID].state)
     {   
         printf("motor_read_angle: motor is not online, state= %d \n\r",  _motors[motorID].state);
-        return;
+        return 0;
     }
     const int avg = 1;
     int encoderReading = 0;
@@ -393,7 +181,7 @@ int motor_read_position(uMotorID motorID)
     if(STATE_MOTOR_OK != _motors[motorID].state)
     {   
         printf("motor_read_position: motor is not online, state= %d \n\r",  _motors[motorID].state);
-        return;
+        return 0;
     }
     return _motor_read_raw(_motors[motorID].sensorPCs);
 }
@@ -427,7 +215,7 @@ void motor_printout(uMotorID motorID)
     puts("motor_printout: print calibration data ... \n\r");
     for(int i = 0; i < MAGNETIC_LUT_SIZE; i++)
     {
-        char str[8];
+        char str[10];
         snprintf(str, sizeof(str), "%f", lookup[motorID][i]);
         printf("%s, ",str);
         if( (i % 16 == 0) && (i != 0) )
@@ -462,9 +250,9 @@ void motor_calibrate(uMotorID motorID) {
 
     int fullStepReadings[MOTOR_SPR];
 
-    int fullStep = 0;
+    //int fullStep = 0;
     int ticks = 0;
-    float lookupAngle = 0.0;
+    //float lookupAngle = 0.0;
     puts("motor_calibrate: Beginning calibration routine ... \n\r");
 
     encoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
@@ -587,7 +375,7 @@ void motor_calibrate(uMotorID motorID) {
     page_count = 0;
     page_ptr = (const uint8_t*) lookup[motorID];
     puts("Writing to flash 0x \n\r");
-    printf("%x ", page_ptr);
+    printf("%p ", page_ptr);
 
     for (int i = iStart; i < (iStart + MOTOR_SPR + 1); i++) {
         ticks = fullStepReadings[mod((i + 1), MOTOR_SPR)] - fullStepReadings[mod((i), MOTOR_SPR)];
@@ -676,71 +464,18 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
 
 void motor_set_power(uMotorID motorID, float power, unsigned char motor_config)
 {
-
+    int ret = 0;
     if(STATE_MOTOR_OK != _motors[motorID].state)
     {   
         printf("motor_set_power: motor %d is not online, state= %d \n\r", motorID,  _motors[motorID].state);
         return;
     }
-
-    uint8_t data[5];
-    uint8_t in_data[5];
-    const float iMAX = 1.0;
-    const float rSense = 0.150;
-    int uMAX = (255/3.3)*(iMAX*10*rSense);
-    int uPower = (255/3.3)*(power*10*rSense);
-    int tryout = 5;
-
-    if(uPower < uMAX)
+    ret = _motor_set_power( _motors[motorID].motorPCs, power, motor_config);
+    if(0 == ret)
     {
-        printf("motor_set_power: ID: %d Calculated uPower %d, sending... \n\r", motorID, uPower);
-
-
-        data[0] = MOTOR_SETUP_CMD;
-        data[1] = uPower;
-        data[2] = motor_config; //TBD
-        data[3] = data[0] + data[1] + data[2];
-        data[4] = 0xff;
-
-        spi_sync_transfer(data[0], _motors[motorID].motorPCs, 0);
-        in_data[0] = spi_sync_transfer(data[1], _motors[motorID].motorPCs, 0);
-        in_data[1] = spi_sync_transfer(data[2], _motors[motorID].motorPCs, 0);
-        in_data[2] = spi_sync_transfer(data[3], _motors[motorID].motorPCs, 0);
-        in_data[3] = spi_sync_transfer(0xFF, _motors[motorID].motorPCs, 1);
-        
-        printf("Ret: %x%x%x%x\n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
-
-        if(in_data[3] != 0x78)
-        {
-            while(tryout--)
-            {
-                spi_sync_transfer(data[0], _motors[motorID].motorPCs, 0);
-                in_data[0] = spi_sync_transfer(data[1], _motors[motorID].motorPCs, 0);
-                in_data[1] = spi_sync_transfer(data[2], _motors[motorID].motorPCs, 0);
-                in_data[2] = spi_sync_transfer(data[3], _motors[motorID].motorPCs, 0);
-                in_data[3] = spi_sync_transfer(0xFF, _motors[motorID].motorPCs, 1);
-                
-                printf(">Ret: %x%x%x%x\n\r", in_data[0], in_data[1], in_data[2], in_data[3]);
-
-                if(in_data[3] == 0x78)
-                {
-                    tryout = 0;
-                    _motors[motorID].power = power;
-                    break;
-                }
-            }
-
-            if(in_data[3] != 0x78)
-            {
-                printf("motor_set_power: ID %d failed\n\r", motorID);
-            }
-
-        }
+        _motors[motorID].power = power;
     }
-    else
-    {
-        printf("motor_set_power: Calculated uPower %d is bigger than uMAX: %d, ignoring... \n\r", uPower, uMAX);
-    }
+  
 }
 
 void motor_set_dir(uMotorID motorID, uint8_t dir)

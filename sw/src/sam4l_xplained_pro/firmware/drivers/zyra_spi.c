@@ -17,7 +17,7 @@
 #define SPI_CLK_PHASE 1
 
 /* Delay before SPCK. */
-#define SPI_DLYBS 300
+#define SPI_DLYBS 250
 
 /* Delay between consecutive transfers. */
 #define SPI_DLYBCT 80
@@ -33,9 +33,6 @@
 static uint32_t gs_ul_spi_clock = 2500000;
 #define SPI_TIMEOUT_READ 1000 //500us
 
-
-uint8_t spi_sync_transfer(uint8_t in_data, uint8_t cs, uint8_t last);
-void spi_master_initialize(void);
 
 /**
  * \brief Initialize SPI as master.

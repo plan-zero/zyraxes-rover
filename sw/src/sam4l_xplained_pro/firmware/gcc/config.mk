@@ -77,6 +77,7 @@ CSRCS = \
        ../src/sam4l_xplained_pro/firmware/zyraxes_firmware.c \
        ../src/sam4l_xplained_pro/firmware/drivers/zyra_spi.c \
        ../src/sam4l_xplained_pro/firmware/drivers/motor.c \
+       ../src/sam4l_xplained_pro/firmware/drivers/motor_spi.c \
        ../src/sam4l_xplained_pro/firmware/drivers/nvm.c \
 
 # List of assembler source files.
