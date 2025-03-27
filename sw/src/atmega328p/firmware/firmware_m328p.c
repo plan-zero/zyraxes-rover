@@ -8,6 +8,7 @@
 #include "magnetic_sensor.h"
 #include "spi.h"
 #include "stdlib.h"
+#include "firmware_e2p.h"
 
 //this is calculated based on the formula
 //motor_step_us = MINUTE_US / (RPM * MOTOR_SPR * MICROSTEP_CONFIG)
@@ -35,8 +36,6 @@ ISR(TIMER2_COMPA_vect)
 
 
 
-//TODO: read this from eprom
-#define TWI_SLAVE_ADDRESS   0x70
 #define TWI_MOTOR_DATA_SIZE 0x5
 #define TWI_SENSOR_DATA_SIZE 0x7
 
@@ -90,6 +89,8 @@ twi_data_t twi_data;
 
 volatile uint8_t twi_rx_status = 0;
 volatile uint8_t twi_tx_status = 0;
+uint8_t twi_chip_address[TWI_CHIP_ADDR_LENGTH];
+uint8_t firmware_version[FIRMWARE_VERSION_LENGTH];
 
 
 int main()
@@ -99,14 +100,26 @@ int main()
 	DDRB |= 1 << PB2;
 	PORTB |= 1 << PB2;
     /*Init uart for debugging/coms*/
+
+    /*read eeprom data*/
+    e2p_read_twi_address(twi_chip_address[0]);
+    e2p_read_firmware_version(firmware_version[0]);
+
     uart_init(UART_115200BAUD, UART_16384MHZ, UART_PARITY_NONE);
     /*Print initial message - print slave address as well*/
-    uart_printString("ATmega328p - Rover firmware, version 2.0",1);
+    uart_printString("ATmega328p - Rover firmware, version v",0);
+    uart_sendByte('0'+ firmware_version[0]);
+    uart_sendByte('.');
+    uart_sendByte('0'+ firmware_version[1]);
+    uart_sendByte('.');
+    uart_sendByte('0'+ firmware_version[2]);
+    uartNewLine();
+
     uart_printString("TWI Slave address: ",0);
-    uartPrintHex(TWI_SLAVE_ADDRESS);
+    uart_printRegister(twi_chip_address[0]);
     uartNewLine();
     /*Init TWI as slave with the give address*/
-    I2C_init(TWI_SLAVE_ADDRESS);
+    I2C_init(twi_chip_address[0]);
     /*Init SPI master*/
     spi_master_init();
 
