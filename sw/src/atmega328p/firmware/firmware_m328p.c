@@ -42,11 +42,11 @@ ISR(TIMER2_COMPA_vect)
 typedef enum{
     CMD_MOTOR_STEP_CW = 0x1,
     CMD_MOTOR_STEP_CCW = 0x2,
-    CMD_MOTOR_RUN_CW = 0x4,
-    CMD_MOTOR_RUN_CCW = 0x5,
-    CMD_MOTOR_STOP = 0x6,
-    CMD_MOTOR_POWEROFF = 0x7,
-    CMD_MOTOR_SYNC = 0x8
+    CMD_MOTOR_RUN_CW = 0x3,
+    CMD_MOTOR_RUN_CCW = 0x4,
+    CMD_MOTOR_STOP = 0x5,
+    CMD_MOTOR_POWEROFF = 0x6,
+    CMD_MOTOR_SYNC = 0x7
 }MasterCMD;
 
 enum{
@@ -105,7 +105,41 @@ int main()
     e2p_read_twi_address(twi_chip_address[0]);
     e2p_read_firmware_version(firmware_version[0]);
 
+    firmware_hw328p_timer_init();
+    firmware_hw328p_set_pwm_0(0);
+    //set timer at 100ms
+    firmware_hw328p_timer_start_A(1);
+
+
     uart_init(UART_115200BAUD, UART_16384MHZ, UART_PARITY_NONE);
+
+    int led_pwm = 0;
+    int led_pwm_dir = 1;
+
+    if(0xFF == twi_chip_address[0])
+    {
+        uart_printString("Atmega328p - invalid E2P data, program eeprom!", 1);
+        sei();
+        while(1)
+        {
+            /*do led patern here*/
+            if(timer_led_count >= 10)
+            {
+                 
+                 firmware_hw328p_set_pwm_0((uint8_t)led_pwm);
+                 led_pwm = led_pwm + led_pwm_dir;
+                 if(led_pwm == 200)
+                     led_pwm_dir = -1;
+                 else if(led_pwm == 5)
+                     led_pwm_dir = 1;
+                timer_led_count = 0;
+             }
+        }
+    }
+    /*Turn LED off*/
+    firmware_hw328p_set_pwm_0(0);
+
+    
     /*Print initial message - print slave address as well*/
     uart_printString("ATmega328p - Rover firmware, version v",0);
     uart_sendByte('0'+ firmware_version[0]);
@@ -134,16 +168,6 @@ int main()
     SLP_PORT |= 1 << SLP_PIN;
     DIR_PORT |= 1 << DIR_PIN;
 
-
-
-    firmware_hw328p_timer_init();
-
-    int led_pwm = 0;
-    int led_pwm_dir = 1;
-    firmware_hw328p_set_pwm_0(0);
-    //set timer at 100ms
-    firmware_hw328p_timer_start_A(1);
-    
     magnetic_sensor_diag();
 
     /*enable global interrupts*/
@@ -176,12 +200,15 @@ int main()
             twi_rx_status = TWI_SLAVE_READY;
             sei();
 
+            
+
             if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CW)
             {
                 SLP_PORT |= (1 << SLP_PIN);
                 DIR_PORT |= 1 << DIR_PIN;
                 free_running = 0;
                 invalid_cmd = 0;
+                steps_to_do = twi_data.motor_data.steps;
             }
             else if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CCW)
             {
@@ -189,6 +216,7 @@ int main()
                 DIR_PORT &= ~(1 << DIR_PIN);
                 free_running = 0;
                 invalid_cmd = 0;
+                steps_to_do = twi_data.motor_data.steps;
             }
             else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CW)
             {
@@ -196,6 +224,7 @@ int main()
                 DIR_PORT |= 1 << DIR_PIN;
                 free_running = 1;
                 invalid_cmd = 0;
+                steps_to_do = 0;
             }
             else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CCW)
             {
@@ -203,6 +232,7 @@ int main()
                 DIR_PORT &= ~(1 << DIR_PIN);
                 free_running = 1;
                 invalid_cmd = 0;
+                steps_to_do = 0;
             }
             else if(twi_data.motor_data.cmd == CMD_MOTOR_STOP)
             {
@@ -228,9 +258,11 @@ int main()
             
             if(!invalid_cmd)
             {
-                steps_to_do = twi_data.motor_data.steps;
+                firmware_hw328p_set_pwm_0(100);
+                timer_led_count = 0;
                 step_wait = (RPM_CONST / (uint16_t)twi_data.motor_data.rpm);
                 firmware_hw328p_timer_start_B((uint8_t)step_wait);
+                
             }
                 
         }
@@ -261,33 +293,31 @@ int main()
 
         if(timer_timer_trigger)
         {
-            if(steps_to_do)
+            if(free_running)
             {
                 STEP_PORT |= 1 << STEP_PIN;
                 _delay_us(5);
                 STEP_PORT &= ~(1 << STEP_PIN);
-                if(!free_running)
-                    steps_to_do--;
+            }
+            else if(steps_to_do)
+            {
+                STEP_PORT |= 1 << STEP_PIN;
+                _delay_us(5);
+                STEP_PORT &= ~(1 << STEP_PIN);
+                steps_to_do--;
             }
             else
             {
                 firmware_hw328p_timer_stop_B();
             }
             timer_timer_trigger = 0;
-        }
-        
-
-
-       if(timer_led_count >= 10)
-       {
             
-            firmware_hw328p_set_pwm_0((uint8_t)led_pwm);
-            led_pwm = led_pwm + led_pwm_dir;
-            if(led_pwm == 200)
-                led_pwm_dir = -1;
-            else if(led_pwm == 5)
-                led_pwm_dir = 1;
-           timer_led_count = 0;
+        }
+
+        if(timer_led_count >= 10)
+        {
+            /*just turn LED off if it was turned ON when command was ACK*/
+            firmware_hw328p_set_pwm_0(0);
         }
 
     }

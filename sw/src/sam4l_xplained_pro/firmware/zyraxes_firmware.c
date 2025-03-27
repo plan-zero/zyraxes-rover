@@ -73,6 +73,8 @@ static void display_menu(void)
 		 "  x: Start commands\n\r"
 		 "  9: TWI motor test\n\r"
 		 "  8: TWI sensor test\n\r"
+		 "  +: TWI next address \n\r"
+		 "  +: TWI next cmd \n\r"
 		 "  h: Display this menu again\n\r\r");
 
 }
@@ -145,10 +147,10 @@ static status_code_t init_twi(void)
 	return twim_set_config(EXAMPLE_TWIM, &opts);
 }
 
-static status_code_t twi_write_package(uint8_t address)
+static status_code_t twi_write_package(uint8_t chip_address, uint8_t address)
 {
 	/* TWI chip address to communicate with */
-	packet_tx.chip = TARGET_ADDRESS;
+	packet_tx.chip = chip_address;
 	packet_tx.ten_bit = false;
 	/* TWI address/commands to issue to the other chip (node) */
 	packet_tx.addr[0] = address;
@@ -164,10 +166,10 @@ static status_code_t twi_write_package(uint8_t address)
 	return twi_master_write(EXAMPLE_TWIM, &packet_tx);
 }
 
-static status_code_t twi_read_package(uint8_t address)
+static status_code_t twi_read_package(uint8_t chip_address, uint8_t address)
 {
 	/* TWI chip address to communicate with */
-	packet_rx.chip = TARGET_ADDRESS;
+	packet_rx.chip = chip_address;
 	packet_rx.ten_bit = false;
 	/* Length of the TWI data address segment (1-3 bytes) */
 	packet_rx.addr_length = 1;
@@ -351,6 +353,8 @@ int main(void)
 	int js_timeout = 0;
 	int left = 0;
 	int right = 0;
+	uint8_t twi_selected_chip = TARGET_ADDRESS;
+	uint8_t twi_testing_cmd = 0x1;
 
 	float angle_m0 = 0, angle_m1 = 0, angle_m2 = 0, angle_m3 = 0;
 	float fangle_m0 = 0, fangle_m1 = 0, fangle_m2 = 0, fangle_m3 = 0;
@@ -514,7 +518,7 @@ int main(void)
 					printf("MOTOR_%d offline/error! \n\r", ati_cmd);
 				break;
 			case '8':
-				twi_read_package(0);
+				twi_read_package(twi_selected_chip,0);
 				int raw = read_data[0] << 8 | read_data[1];
 				printf("Raw angle: %d \n\r", raw);
 				
@@ -523,18 +527,32 @@ int main(void)
 			case '9':
 				//motor TWI test
 				/*set CMDs motor CW*/
-				write_data[0] = 2;
+				write_data[0] = twi_testing_cmd;
 				/*Set 12800 microteps = 2 full rotations*/
 				write_data[1] = 50;
 				write_data[2] = 0;
 				/*set rpm 150*/
-				write_data[3] = 150;
+				write_data[3] = 200;
 				/*reserved for now*/
 				write_data[4] = 0;
 
-				twi_write_package(0);
+				twi_write_package(twi_selected_chip, 0);
 
 
+				break;
+			case '+':
+				if(twi_selected_chip < 0x78)
+					twi_selected_chip++;
+				else
+					twi_selected_chip = 0x70;
+				printf("TWI switch address %x \n\r", twi_selected_chip);
+			    break;
+			case '-':
+				if(twi_testing_cmd < 0x7)
+					twi_testing_cmd++;
+				else
+					twi_testing_cmd = 0x1;
+				printf("TWI switch cmd %x \n\r", twi_testing_cmd);
 				break;
 			case 'h':
 				display_menu();
