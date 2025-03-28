@@ -9,6 +9,7 @@
 #include "spi.h"
 #include "stdlib.h"
 #include "firmware_e2p.h"
+#include "twi_common.h"
 
 //this is calculated based on the formula
 //motor_step_us = MINUTE_US / (RPM * MOTOR_SPR * MICROSTEP_CONFIG)
@@ -19,11 +20,13 @@
 volatile int timer_timer_trigger = 0;
 volatile int timer_led_count = 0;
 volatile int timer_sensor_count = 0;
+volatile int timer_firmware_exec_count = 0;
 ISR(TIMER1_COMPA_vect)
 {
     
     timer_led_count++;
     timer_sensor_count++;
+    timer_firmware_exec_count++;
     
 }
 
@@ -37,30 +40,11 @@ ISR(TIMER2_COMPA_vect)
 
 
 #define TWI_MOTOR_DATA_SIZE 0x5
-#define TWI_SENSOR_DATA_SIZE 0x7
+#define TWI_SENSOR_DATA_SIZE 0x6
+#define TWI_FIRMWARE_INFO_SIZE 0x3
+#define TWI_FIRMWARE_CMD_SIZE 0x1
 
-typedef enum{
-    CMD_MOTOR_STEP_CW = 0x1,
-    CMD_MOTOR_STEP_CCW = 0x2,
-    CMD_MOTOR_RUN_CW = 0x3,
-    CMD_MOTOR_RUN_CCW = 0x4,
-    CMD_MOTOR_STOP = 0x5,
-    CMD_MOTOR_POWEROFF = 0x6,
-    CMD_MOTOR_SYNC = 0x7
-}MasterCMD;
 
-enum{
-    TWI_RX_ADDR_CMD = 0,
-    TWI_RX_ADDR_STEPS = 1,
-    TWI_RX_ADDR_RPM = 3,
-    TWI_RX_ADDR_CMD_DIAG = 4
-};
-enum{
-    TWI_TX_ADDR_SENSOR_RAW = 0,
-    TWI_TX_ADDR_SENSOR_DIAG1 = 2,
-    TWI_TX_ADDR_SENSOR_DIAG2 = 4,
-    TWI_TX_ADDR_MOTOR_STATUS = 5
-};
 
 typedef struct{
     union{
@@ -76,12 +60,12 @@ typedef struct{
     {
         struct{
             uint16_t raw_value;
-            uint16_t diag1;
-            uint16_t diag2;
-            uint8_t cmd;
+            uint32_t diag;
         };
-        uint8_t sensor_data[TWI_SENSOR_DATA_SIZE];
+        uint8_t data[TWI_SENSOR_DATA_SIZE];
     }sensor_data;
+    uint8_t firmware_cmd;
+    uint8_t firmware_info[TWI_FIRMWARE_INFO_SIZE];
     uint8_t transfer_status;
 }twi_data_t;
 
@@ -149,6 +133,11 @@ int main()
     uart_sendByte('0'+ firmware_version[2]);
     uartNewLine();
 
+    //update information into the TX buffer (this is not update in the main loop)
+    txbuffer[TWI_TX_ADDR_FIRMWARE_VERSION] = firmware_version[0];
+    txbuffer[TWI_TX_ADDR_FIRMWARE_VERSION + 1] = firmware_version[1];
+    txbuffer[TWI_TX_ADDR_FIRMWARE_VERSION + 2] = firmware_version[2];
+
     uart_printString("TWI Slave address: ",0);
     uart_printRegister(twi_chip_address[0]);
     uartNewLine();
@@ -177,6 +166,7 @@ int main()
     uint8_t free_running = 0;
     uint8_t invalid_cmd = 0;
     unsigned char print_msg[10];
+    twi_data.firmware_cmd = CMD_FIRMWARE_NONE;
 
     DDRB |= 1 << PINB2;
 
@@ -193,7 +183,7 @@ int main()
             twi_data.motor_data.cmd = rxbuffer[TWI_RX_ADDR_CMD];
             twi_data.motor_data.steps = rxbuffer[TWI_RX_ADDR_STEPS] << 8 | rxbuffer[TWI_RX_ADDR_STEPS+1];
             twi_data.motor_data.rpm = rxbuffer[TWI_RX_ADDR_RPM];
-            twi_data.sensor_data.cmd = txbuffer[TWI_RX_ADDR_CMD_DIAG];
+            twi_data.firmware_cmd = rxbuffer[TWI_RX_ADDR_CMD_FIRMWARE];
             //clear rx buffer
             for(int i = 0;i < 10;i++)
                 rxbuffer[i] = 0;
@@ -288,7 +278,26 @@ int main()
                 //itoa(twi_data.sensor_data.raw_value,print_msg,10);
                 //uart_printString(print_msg,1);
                 timer_sensor_count = 0;
+
             }
+        }
+        //do firmware tasks each 100ms
+        if(timer_firmware_exec_count >= 100)
+        {
+            if(CMD_FIRMWARE_SENSOR_DIAG == twi_data.firmware_cmd)
+            {
+                cli();
+                twi_data.sensor_data.diag = magnetic_sensor_diag();
+                sei();
+                
+                txbuffer[TWI_TX_ADDR_SENSOR_DIAG1] = twi_data.sensor_data.data[2];
+                txbuffer[TWI_TX_ADDR_SENSOR_DIAG1+1] = twi_data.sensor_data.data[3];
+                txbuffer[TWI_TX_ADDR_SENSOR_DIAG2] = twi_data.sensor_data.data[4];
+                txbuffer[TWI_TX_ADDR_SENSOR_DIAG2+1] = twi_data.sensor_data.data[5];
+                twi_data.firmware_cmd = CMD_FIRMWARE_NONE;
+            }
+
+            timer_firmware_exec_count = 0;
         }
 
         if(timer_timer_trigger)

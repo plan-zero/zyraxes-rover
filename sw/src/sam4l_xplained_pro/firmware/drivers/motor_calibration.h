@@ -14,7 +14,7 @@ typedef enum {
 
 }uMotorID;
 
-#define MOTOR_MICROSTEP_CONFIG      16
+#define MOTOR_MICROSTEP_CONFIG      32
 #define MOTOR_MICROSTEP_WAIT_US     100
 
 #define MINUTE_TO_US 60000000

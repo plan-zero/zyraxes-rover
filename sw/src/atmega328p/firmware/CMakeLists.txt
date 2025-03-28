@@ -30,6 +30,7 @@ set(FIRMWARE_M328P_INC
     ${CMAKE_SOURCE_DIR}/../drivers/interrupts
     ${CMAKE_SOURCE_DIR}/../drivers/twi_slave
     ${CMAKE_SOURCE_DIR}/../drivers/spi
+    ${CMAKE_SOURCE_DIR}/../../common/inc
 )
 include_directories(${FIRMWARE_M328P_INC})
 

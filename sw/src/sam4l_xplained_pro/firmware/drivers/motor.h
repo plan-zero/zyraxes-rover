@@ -66,7 +66,7 @@ typedef struct {
 }sMotorInstance;
 
 
-void motor_init(uMotorID motorID, sMotorType motorType, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox);
+void motor_init(uMotorID motorID, sMotorType motorType, uint8_t slaveAddress, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox);
 float motor_read_angle(uMotorID motorID);
 int motor_read_position(uMotorID motorID);
 void motor_one_step(uMotorID motorID, uint8_t dir);

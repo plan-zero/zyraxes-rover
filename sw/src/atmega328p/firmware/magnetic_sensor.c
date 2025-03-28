@@ -7,7 +7,6 @@
 uint16_t magnetic_sensor_read()
 {
     uint16_t angleTemp;
-    uint8_t b1 = 0, b2 = 0;
 
 	angleTemp = spi_rx_16(0xFFFF);
 
@@ -20,17 +19,19 @@ uint16_t magnetic_sensor_read()
     return angleTemp; //>> MAGNETIC_REDUCE_RESOLUTION;
 }
 
-void magnetic_sensor_diag()
+uint32_t magnetic_sensor_diag()
 {
 
 	long angleTemp = 0;
 	uint16_t data = 0;
+	uint32_t ret;
 
 	uart_printString("motor_diag: Checking AS5047 diagnostic and error registers ... ", 1);
 
 	spi_tx_16(0xFFFC);
 	_delay_ms(1);
-	data = spi_rx_16(0xC000);//((b1 << 8) | b2);
+	data = spi_rx_16(0xC000);
+	ret = (uint32_t)data & 0x0000FFFF;
 
 	uart_printString("motor_diag: Check DIAAGC register ... ", 1);
 
@@ -53,6 +54,7 @@ void magnetic_sensor_diag()
 	spi_tx_16(0x4001);
   	_delay_ms(1);
 	data = spi_rx_16(0xC000);//((b1 << 8) | b2);
+	ret |= (uint32_t)data << 16;
 
     uart_printString("motor_diag: Check ERRFL register ...", 1);
 
@@ -76,5 +78,5 @@ void magnetic_sensor_diag()
 
     _delay_ms(1);
 
-
+	return ret;
 }

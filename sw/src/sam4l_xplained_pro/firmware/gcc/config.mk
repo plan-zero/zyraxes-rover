@@ -76,6 +76,7 @@ CSRCS = \
        sam/utils/syscalls/gcc/syscalls.c \
        ../src/sam4l_xplained_pro/firmware/zyraxes_firmware.c \
        ../src/sam4l_xplained_pro/firmware/drivers/zyra_spi.c \
+       ../src/sam4l_xplained_pro/firmware/drivers/zyra_twi.c \
        ../src/sam4l_xplained_pro/firmware/drivers/motor.c \
        ../src/sam4l_xplained_pro/firmware/drivers/motor_spi.c \
        ../src/sam4l_xplained_pro/firmware/drivers/motor_twi.c \
@@ -112,6 +113,7 @@ INC_PATH = \
        thirdparty/CMSIS/Include                           \
        thirdparty/CMSIS/Lib/GCC \
        sam/drivers/spi/example/sam4lc4c_sam4l_xplained_pro/gcc \
+       ../src/common/inc \
        ../src/sam4l_xplained_pro/firmware/config \
        ../src/sam4l_xplained_pro/firmware \
        ../src/sam4l_xplained_pro/firmware/drivers \

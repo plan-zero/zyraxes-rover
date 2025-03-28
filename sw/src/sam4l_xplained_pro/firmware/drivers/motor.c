@@ -125,9 +125,14 @@ static inline int mod(int xMod, int mMod) {
 }
 
 
-void motor_init(uMotorID motorID, sMotorType motorType, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox)
+void motor_init(uMotorID motorID, sMotorType motorType, uint8_t slaveAddress, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox)
 {
-    printf("motor_init: Initialize motor ID=%d, PCs selected driver %d senzor %d... \n\r", motorID, motorPCs, sensorPCs);
+    if(motorType == TYPE_MOTOR_SPI)
+        printf("motor_init: Initialize motor ID=%d, PCs selected driver %d senzor %d... \n\r", motorID, motorPCs, sensorPCs);
+    else if (motorType == TYPE_MOTOR_TWI)
+        printf("motor_init: Initialize motor ID=%d, slave address %x... \n\r", motorID, slaveAddress);
+    else
+        printf("motor_init: Invalid motor type, exiting initalization... \n\r");
 
     _motors[motorID].state = STATE_MOTOR_UNKNOWN;
     _motors[motorID].motorPCs = motorPCs;
@@ -138,6 +143,7 @@ void motor_init(uMotorID motorID, sMotorType motorType, uint8_t motorPCs, uint8_
     _motors[motorID].gearbox = gearbox;
     _motors[motorID].idle = 1;
     _motors[motorID].motorType = motorType;
+    _motors[motorID].slaveAddress = slaveAddress;
 
     printf("motor_init: sync with motor driver, sending... \n\r");
 
@@ -239,7 +245,7 @@ void motor_microstep(uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
 void motor_one_step(uMotorID motorID, uint8_t dir)
 {
         _motors[motorID].dir = dir;
-        _motor_micro_step(motorID, dir, 16, 150);
+        _motor_micro_step(motorID, dir, MOTOR_MICROSTEP_CONFIG, 150);
         delay_us(187 * MOTOR_MICROSTEP_WAIT_US);
 }
 
@@ -347,7 +353,7 @@ void motor_calibrate(uMotorID motorID) {
     motor_one_step(motorID, dir);
     delay_ms(500);
 
-    if ((_motor_read_raw(motorID) - encoderReading) < 0)   //check which way motor moves when dir = true
+    if ((_motor_read_raw(motorID) - encoderReading) > 0)   //check which way motor moves when dir = true
     {
         puts("Wired backwards \n\r");    // rewiring either phase should fix this.  You may get a false message if you happen to be near the point where the encoder rolls over...
         return;
