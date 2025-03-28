@@ -302,14 +302,14 @@ int main(void)
 
 	//wait for motors driver to start
 	delay_ms(2000);
-	motor_init(MOTOR_0, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0, 5.18);
-	motor_init(MOTOR_1, SPI_CHIP_PCS_2, SPI_CHIP_PCS_3, 0, 5.18);
-	motor_init(MOTOR_2, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0, 5.18);
-	motor_init(MOTOR_3, SPI_CHIP_PCS_6, SPI_CHIP_PCS_7, 0, 5.18);
-	motor_init(MOTOR_4, SPI_CHIP_PCS_8, SPI_CHIP_PCS_9, 0, 5.18);
-	motor_init(MOTOR_5, SPI_CHIP_PCS_10, SPI_CHIP_PCS_11, 0, 5.18);
-	motor_init(MOTOR_6, SPI_CHIP_PCS_12, SPI_CHIP_PCS_13, 0, 5.18);
-	motor_init(MOTOR_7, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 5.18);
+	motor_init(MOTOR_0, TYPE_MOTOR_SPI, SPI_CHIP_PCS_0, SPI_CHIP_PCS_1, 0, 5.18);
+	motor_init(MOTOR_1, TYPE_MOTOR_SPI, SPI_CHIP_PCS_2, SPI_CHIP_PCS_3, 0, 5.18);
+	motor_init(MOTOR_2, TYPE_MOTOR_SPI, SPI_CHIP_PCS_4, SPI_CHIP_PCS_5, 0, 5.18);
+	motor_init(MOTOR_3, TYPE_MOTOR_SPI, SPI_CHIP_PCS_6, SPI_CHIP_PCS_7, 0, 5.18);
+	motor_init(MOTOR_4, TYPE_MOTOR_SPI, SPI_CHIP_PCS_8, SPI_CHIP_PCS_9, 0, 5.18);
+	motor_init(MOTOR_5, TYPE_MOTOR_SPI, SPI_CHIP_PCS_10, SPI_CHIP_PCS_11, 0, 5.18);
+	motor_init(MOTOR_6, TYPE_MOTOR_SPI, SPI_CHIP_PCS_12, SPI_CHIP_PCS_13, 0, 5.18);
+	motor_init(MOTOR_7, TYPE_MOTOR_SPI, SPI_CHIP_PCS_14, SPI_CHIP_PCS_15, 0, 5.18);
 	//wait to go to zero pozition
 	delay_ms(1000);
 	motor_set_power(MOTOR_0, 0.9, 0xFA);

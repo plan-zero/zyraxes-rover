@@ -21,12 +21,20 @@ typedef enum {
     STATE_MOTOR_COUNT
 }sMotorState;
 
+typedef enum {
+    TYPE_MOTOR_SPI = 0,
+    TYPE_MOTOR_TWI,
+    TYPE_MOTOR_COUNT
+}sMotorType;
+
 typedef struct {
     uint8_t motorID;
     uint8_t motorPCs;
     uint8_t sensorPCs;
+    uint8_t slaveAddress;
     uint8_t dir;
     sMotorState state;
+    sMotorType motorType;
     int stepNumber;
     int us_per_microstep;
     
@@ -58,7 +66,7 @@ typedef struct {
 }sMotorInstance;
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox);
+void motor_init(uMotorID motorID, sMotorType motorType, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox);
 float motor_read_angle(uMotorID motorID);
 int motor_read_position(uMotorID motorID);
 void motor_one_step(uMotorID motorID, uint8_t dir);

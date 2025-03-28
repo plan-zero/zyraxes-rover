@@ -9,7 +9,7 @@
 
 
 
-void _motor_diag(uint8_t PCs)
+void motor_diag_spi(uint8_t PCs)
 {
 	long angleTemp = 0;
 	uint16_t data = 0;
@@ -82,7 +82,7 @@ void _motor_diag(uint8_t PCs)
 }
 
 
-int  _motor_sync(uMotorID motorID, uint8_t PCs)
+int  motor_sync_spi(uint8_t PCs)
 {
 
 	//uint8_t response = 0;
@@ -127,7 +127,7 @@ int  _motor_sync(uMotorID motorID, uint8_t PCs)
 
         if(in_data[3] != 0xAA)
         {
-            printf("_motor_sync: ID: %d failed\n\r", motorID);
+            printf("_motor_sync: failed\n\r");
             return 1;
         }
 
@@ -137,7 +137,7 @@ int  _motor_sync(uMotorID motorID, uint8_t PCs)
 }
 
 
-uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t steps, uint8_t rpm)
+uint16_t motor_micro_step_spi( uint8_t PCs, uint8_t dir, uint16_t steps, uint8_t rpm)
 {
     uint8_t in_data[4];
 	uint8_t data[5];
@@ -192,7 +192,7 @@ uint16_t _motor_micro_step( uint8_t PCs, uint8_t dir, uint16_t steps, uint8_t rp
 }
 
 
-int _motor_read_raw(uint8_t PCs)
+int motor_read_raw_spi(uint8_t PCs)
 {
     uint16_t angleTemp;
     uint8_t b1 = 0, b2 = 0;
@@ -212,7 +212,7 @@ int _motor_read_raw(uint8_t PCs)
 }
 
 
-int _motor_set_power(uint8_t PCs, float power, unsigned char motor_config)
+int motor_set_power_spi(uint8_t PCs, float power, unsigned char motor_config)
 {
     uint8_t data[5];
     uint8_t in_data[5];

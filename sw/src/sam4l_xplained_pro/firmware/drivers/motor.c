@@ -1,6 +1,7 @@
 #include "motor_calibration.h"
 #include "motor.h"
 #include "motor_spi.h"
+#include "motor_twi.h"
 
 #include "delay.h"
 #include "nvm.h"
@@ -34,12 +35,97 @@ int motors_turning_position = 0;
 sMotorInstance _motors[MOTOR_COUNT];
 
 
+static inline void _motor_diag(uMotorID motorID)
+{
+    if(_motors[motorID].motorType == TYPE_MOTOR_SPI)
+    {
+        motor_diag_spi(_motors[motorID].sensorPCs);
+    }
+    else if(_motors[motorID].motorType == TYPE_MOTOR_TWI)
+    {
+        motor_diag_twi(_motors[motorID].slaveAddress);
+    }
+    else
+    {
+        printf("_motor_diag: error, invalid motor type! \n\r");
+    }
+}
+
+static inline int _motor_sync(uMotorID motorID)
+{
+    if(_motors[motorID].motorType == TYPE_MOTOR_SPI)
+    {
+        return motor_sync_spi(_motors[motorID].motorPCs);
+    }
+    else if(_motors[motorID].motorType == TYPE_MOTOR_TWI)
+    {
+        return motor_sync_twi(_motors[motorID].slaveAddress);
+    }
+    else
+    {
+        printf("_motor_sync: error, invalid motor type! \n\r");
+        return 1;
+    }
+}
+
+static inline uint16_t _motor_micro_step( uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
+{
+    if(_motors[motorID].motorType == TYPE_MOTOR_SPI)
+    {
+        return motor_micro_step_spi(_motors[motorID].motorPCs, dir, steps, rpm);
+    }
+    else if(_motors[motorID].motorType == TYPE_MOTOR_TWI)
+    {
+        return motor_micro_step_twi(_motors[motorID].slaveAddress, dir, steps, rpm);
+    }
+    else
+    {
+        printf("_motor_micro_step: error, invalid motor type! \n\r");
+        return 1;
+    }
+}
+
+static inline int _motor_read_raw(uMotorID motorID)
+{
+    if(_motors[motorID].motorType == TYPE_MOTOR_SPI)
+    {
+        return motor_read_raw_spi(_motors[motorID].sensorPCs);
+    }
+    else if(_motors[motorID].motorType == TYPE_MOTOR_TWI)
+    {
+        return motor_read_raw_twi(_motors[motorID].slaveAddress);
+    }
+    else
+    {
+        printf("_motor_read_raw: error, invalid motor type! \n\r");
+        return 1;
+    }
+}
+
+static inline int _motor_set_power(uMotorID motorID, float power, unsigned char motor_config)
+{
+    if(_motors[motorID].motorType == TYPE_MOTOR_SPI)
+    {
+        return motor_set_power_spi(_motors[motorID].motorPCs, power, motor_config);
+    }
+    else if(_motors[motorID].motorType == TYPE_MOTOR_TWI)
+    {
+        printf("_motor_read_raw: error, TWI version doesn't support dynamic power setup! \n\r");
+        return -1;
+    }
+    else
+    {
+        printf("_motor_read_raw: error, invalid motor type! \n\r");
+        return -1;
+    }
+}
+
 static inline int mod(int xMod, int mMod) {
   return (xMod % mMod + mMod) % mMod;
 }
 
 
-void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox)
+void motor_init(uMotorID motorID, sMotorType motorType, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox)
 {
     printf("motor_init: Initialize motor ID=%d, PCs selected driver %d senzor %d... \n\r", motorID, motorPCs, sensorPCs);
 
@@ -51,21 +137,22 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
     _motors[motorID].RPM = 0;
     _motors[motorID].gearbox = gearbox;
     _motors[motorID].idle = 1;
+    _motors[motorID].motorType = motorType;
 
     printf("motor_init: sync with motor driver, sending... \n\r");
 
 
-    if(_motor_sync(motorID, _motors[motorID].motorPCs))
+    if(_motor_sync(motorID))
     {
         _motors[motorID].state = STATE_MOTOR_ERROR;
-        printf("motor_init: sync error \n\r");
+        printf("motor_init: sync error, id:%d \n\r", motorID);
     }
     else
     {
         _motors[motorID].state = STATE_MOTOR_OK;
         char str[10];
         //get initial senzor data
-        _motors[motorID].init_pos = _motor_read_raw(_motors[motorID].motorPCs = motorPCs);
+        _motors[motorID].init_pos = _motor_read_raw(motorID);
         //get few reads to make sure there is no flush data in SPI
         for(int i = 0; i < 2; i++) {
             _motors[motorID].init_angle = motor_read_angle(motorID);
@@ -90,12 +177,12 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
             {
                 steps_to_zero = (unsigned int)(abs(delta_angle) / angle_step_conv);
                 if(delta_angle <= 0){
-                    _motor_micro_step(_motors[motorID].motorPCs, MOTOR_FORWARD, steps_to_zero, 50);
+                    _motor_micro_step(motorID, MOTOR_FORWARD, steps_to_zero, 50);
                     printf("1\n\r");
                 }
                 else
                 {
-                     _motor_micro_step(_motors[motorID].motorPCs, MOTOR_REVERSE, steps_to_zero, 50);
+                     _motor_micro_step(motorID, MOTOR_REVERSE, steps_to_zero, 50);
                      printf("2\n\r");
                 }
             }
@@ -104,12 +191,12 @@ void motor_init(uMotorID motorID, uint8_t motorPCs, uint8_t sensorPCs, uint8_t g
                 steps_to_zero = (unsigned int)( (360.0 - abs(delta_angle)) / angle_step_conv);
                 if(delta_angle <= 0)
                 {
-                    _motor_micro_step(_motors[motorID].motorPCs, MOTOR_REVERSE, steps_to_zero, 50);
+                    _motor_micro_step(motorID, MOTOR_REVERSE, steps_to_zero, 50);
                     printf("3\n\r");
                 }
                 else
                 {
-                     _motor_micro_step(_motors[motorID].motorPCs, MOTOR_FORWARD, steps_to_zero, 50);
+                     _motor_micro_step(motorID, MOTOR_FORWARD, steps_to_zero, 50);
                     printf("4\n\r");
                 }
             }
@@ -144,7 +231,7 @@ void motor_microstep(uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
     uint16_t ret = 0;
     _motors[motorID].dir = dir;
 
-    ret = _motor_micro_step(_motors[motorID].motorPCs, dir, steps, rpm);
+    ret = _motor_micro_step(motorID, dir, steps, rpm);
     if(ret)
         printf("motor_microstep: ID: %d failed \n\r", motorID);
 }
@@ -152,7 +239,7 @@ void motor_microstep(uMotorID motorID, uint8_t dir, uint16_t steps, uint8_t rpm)
 void motor_one_step(uMotorID motorID, uint8_t dir)
 {
         _motors[motorID].dir = dir;
-        _motor_micro_step(_motors[motorID].motorPCs, dir, 16, 150);
+        _motor_micro_step(motorID, dir, 16, 150);
         delay_us(187 * MOTOR_MICROSTEP_WAIT_US);
 }
 
@@ -167,7 +254,7 @@ float motor_read_angle(uMotorID motorID)
     int encoderReading = 0;
 
     for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
-        encoderReading += _motor_read_raw(_motors[motorID].sensorPCs);
+        encoderReading += _motor_read_raw(motorID);
     }
 
     return encoderReading * (360.0 / 4096) / avg;
@@ -183,7 +270,7 @@ int motor_read_position(uMotorID motorID)
         printf("motor_read_position: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return 0;
     }
-    return _motor_read_raw(_motors[motorID].sensorPCs);
+    return _motor_read_raw(motorID);
 }
 
 void motor_sync(uMotorID motorID)
@@ -193,7 +280,7 @@ void motor_sync(uMotorID motorID)
         printf("motor_sync: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
     }
-    _motor_sync(motorID ,_motors[motorID].motorPCs);
+    _motor_sync(motorID);
 }
 
 void motor_diagnoise(uMotorID motorID)
@@ -203,7 +290,7 @@ void motor_diagnoise(uMotorID motorID)
         printf("motor_diagnoise: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
     }
-    _motor_diag(_motors[motorID].sensorPCs);
+    _motor_diag(motorID);
 }
 
 void motor_printout(uMotorID motorID)
@@ -255,12 +342,12 @@ void motor_calibrate(uMotorID motorID) {
     //float lookupAngle = 0.0;
     puts("motor_calibrate: Beginning calibration routine ... \n\r");
 
-    encoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
+    encoderReading = _motor_read_raw(motorID);
     int dir = MOTOR_REVERSE;
     motor_one_step(motorID, dir);
     delay_ms(500);
 
-    if ((_motor_read_raw(_motors[motorID].sensorPCs) - encoderReading) < 0)   //check which way motor moves when dir = true
+    if ((_motor_read_raw(motorID) - encoderReading) < 0)   //check which way motor moves when dir = true
     {
         puts("Wired backwards \n\r");    // rewiring either phase should fix this.  You may get a false message if you happen to be near the point where the encoder rolls over...
         return;
@@ -282,10 +369,10 @@ void motor_calibrate(uMotorID motorID) {
 
     encoderReading = 0;
     delay_ms(50);                         //moving too fast may not give accurate readings.  Motor needs time to settle after each step.
-    lastencoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
+    lastencoderReading = _motor_read_raw(motorID);
         
     for (int reading = 0; reading < avg; reading++) {  //average multple readings at each step
-        currentencoderReading = _motor_read_raw(_motors[motorID].sensorPCs);
+        currentencoderReading = _motor_read_raw(motorID);
 
         if ((currentencoderReading-lastencoderReading)<(-(cpr/2))){
         currentencoderReading += cpr;
@@ -456,7 +543,7 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
     _motors[motorID].RPM = RPM;
     _motors[motorID].us_per_microstep = microstep_wait;
 
-    //_motor_micro_step( _motors[motorID].motorPCs, _motors[motorID].dir, 0x1fff, RPM);
+    //_motor_micro_step( motorID, _motors[motorID].dir, 0x1fff, RPM);
     //user motor task instead
     _motors[motorID].motor_position_needs_update = 1;
 
@@ -470,7 +557,7 @@ void motor_set_power(uMotorID motorID, float power, unsigned char motor_config)
         printf("motor_set_power: motor %d is not online, state= %d \n\r", motorID,  _motors[motorID].state);
         return;
     }
-    ret = _motor_set_power( _motors[motorID].motorPCs, power, motor_config);
+    ret = _motor_set_power(motorID, power, motor_config);
     if(0 == ret)
     {
         _motors[motorID].power = power;
@@ -555,12 +642,12 @@ void motor_task()
 
             steps_to_do = (unsigned int)(abs(delta_abs) / angle_step_conv * _motors[i].gearbox);
             if(delta_abs <= 0){
-                _motor_micro_step(_motors[i].motorPCs, MOTOR_REVERSE, steps_to_do, 100);
+                _motor_micro_step(i, MOTOR_REVERSE, steps_to_do, 100);
                 //printf("1\n\r");
             }
             else
             {
-                _motor_micro_step(_motors[i].motorPCs, MOTOR_FORWARD, steps_to_do, 100);
+                _motor_micro_step(i, MOTOR_FORWARD, steps_to_do, 100);
                 //printf("2\n\r");
             }
             _motors[i].motor_position_needs_update = 0;
@@ -576,33 +663,33 @@ void motor_task()
                 printf("Do soft start %d \n\r", rpm_soft_start[rpm_count]);
                 if(motors_turning_position > 0)
                 {
-                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
-                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
-                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 5, _motors[5].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( 1, _motors[1].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( 7, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 3, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
                 }
                 else if(motors_turning_position < 0)
                 {
-                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
-                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);           
+                    _motor_micro_step( 5, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 1, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 7, _motors[7].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( 3, _motors[3].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);           
                 }
                 else
                 {
-                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 5, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 1, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 7, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 3, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
                 }
                 rpm_count++;
             }
             else
             {
-                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, _motors[5].RPM);
-                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, _motors[1].RPM);
-                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, _motors[7].RPM);
-                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, _motors[3].RPM);
+                _motor_micro_step( 5, _motors[5].dir, 0x1fff, _motors[5].RPM);
+                _motor_micro_step( 1, _motors[1].dir, 0x1fff, _motors[1].RPM);
+                _motor_micro_step( 7, _motors[7].dir, 0x1fff, _motors[7].RPM);
+                _motor_micro_step( 3, _motors[3].dir, 0x1fff, _motors[3].RPM);
 
                 printf("full speed \n\r");
                 rpm_count = RPM_MAX -1;
@@ -617,34 +704,34 @@ void motor_task()
                 printf("Do soft stop %d \n\r", rpm_soft_start[rpm_count]);
                 if(motors_turning_position > 0)
                 {
-                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
-                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
-                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 5, _motors[5].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( 1, _motors[1].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( 7, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 3, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
                 }
                 else if(motors_turning_position < 0)
                 {
-                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
-                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);           
+                    _motor_micro_step( 5, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 1, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 7, _motors[7].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);
+                    _motor_micro_step( 3, _motors[3].dir, 0x1fff, rpm_soft_start_diff[rpm_count]);           
                 }
                 else
                 {
-                    _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
-                    _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 5, _motors[5].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 1, _motors[1].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 7, _motors[7].dir, 0x1fff, rpm_soft_start[rpm_count]);
+                    _motor_micro_step( 3, _motors[3].dir, 0x1fff, rpm_soft_start[rpm_count]);
                 }
                 rpm_count--;
             }
             else
             {
                 printf("stop motors \n\r");
-                _motor_micro_step( _motors[5].motorPCs, _motors[5].dir, 0, 0);
-                _motor_micro_step( _motors[1].motorPCs, _motors[1].dir, 0, 0);
-                _motor_micro_step( _motors[7].motorPCs, _motors[7].dir, 0, 0);
-                _motor_micro_step( _motors[3].motorPCs, _motors[3].dir, 0, 0);
+                _motor_micro_step( 5, _motors[5].dir, 0, 0);
+                _motor_micro_step( 1, _motors[1].dir, 0, 0);
+                _motor_micro_step( 7, _motors[7].dir, 0, 0);
+                _motor_micro_step( 3, _motors[3].dir, 0, 0);
                 rpm_count = 0;
                 soft_stop = 0;
             }
