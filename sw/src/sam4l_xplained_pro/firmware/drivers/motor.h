@@ -3,6 +3,7 @@
 
 #include "asf.h"
 #include "motor_calibration.h"
+#include "twi_common.h"
 
 
 //this is clockwise 
@@ -13,13 +14,6 @@
 #define MOTORS_TURNING_POS 5
 extern int turning_speed_red[MOTORS_TURNING_POS];
 extern int motors_turning_position;
-
-typedef enum {
-    STATE_MOTOR_UNKNOWN = 0,
-    STATE_MOTOR_OK,
-    STATE_MOTOR_ERROR,
-    STATE_MOTOR_COUNT
-}sMotorState;
 
 typedef enum {
     TYPE_MOTOR_SPI = 0,

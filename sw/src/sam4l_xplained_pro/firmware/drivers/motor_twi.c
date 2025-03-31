@@ -154,3 +154,14 @@ int motor_read_raw_twi(uint8_t address)
     return angle >> MAGNETIC_REDUCE_RESOLUTION;
 }
 
+int motor_get_status_twi(uint8_t address)
+{
+    status_code_t status = STATUS_OK;
+    status = _twi_read_package(address, TWI_TX_ADDR_MOTOR_STATUS, TWI_TX_ADDR_MOTOR_STATUS, 1);
+    if(status != STATUS_OK){
+      printf("motor_get_status_twi: comm error, %d \n\r", status);
+      return -1;
+    }
+    return firmware_rx_data[TWI_TX_ADDR_MOTOR_STATUS];
+}
+

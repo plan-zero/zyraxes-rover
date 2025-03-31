@@ -485,7 +485,9 @@ int main(void)
 			case '7':
 				ati_cmd = uc_key - '0';
 				printf("Select MOTOR_%d \n\r", ati_cmd);
-				if(motor_get_status(ati_cmd) == STATE_MOTOR_OK)
+				uint8_t motor_status = motor_get_status(ati_cmd);
+				printf("\tstatus: %d\r\n", motor_status);
+				if(motor_status > MOTOR_STATUS_ERROR)
 					selected_motor = ati_cmd;
 				else
 					printf("MOTOR_%d offline/error! \n\r", ati_cmd);
@@ -637,7 +639,7 @@ int main(void)
 			case 'b':
 				for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
 				{
-					if(motor_get_status(i) == STATE_MOTOR_OK)
+					if(motor_get_status(i) > MOTOR_STATUS_ERROR)
 						motor_set_power(i, 0.9, 0xFA);
 				}
 			break;

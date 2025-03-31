@@ -32,6 +32,11 @@
 #define MICROSTEP_PORT     PORTD
 #define MICROSTEP_DDR      DDRD
 
+#define SWITCH_PIN  PD2
+#define SWITCH_PORT PORRD
+#define SWITCH_OUTP PIND
+#define SWITCH_DDR  DDRD
+
 
 #define firmware_hw328p_set_pwm_0(x) OCR0A = (uint8_t)x
 void firmware_hw328p_timer_init();

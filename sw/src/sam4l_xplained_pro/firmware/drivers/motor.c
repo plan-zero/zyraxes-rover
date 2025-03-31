@@ -134,7 +134,7 @@ void motor_init(uMotorID motorID, sMotorType motorType, uint8_t slaveAddress, ui
     else
         printf("motor_init: Invalid motor type, exiting initalization... \n\r");
 
-    _motors[motorID].state = STATE_MOTOR_UNKNOWN;
+    _motors[motorID].state = MOTOR_STATUS_UNKNOWN;
     _motors[motorID].motorPCs = motorPCs;
     _motors[motorID].sensorPCs = sensorPCs;
     _motors[motorID].motorID = motorID;
@@ -150,12 +150,12 @@ void motor_init(uMotorID motorID, sMotorType motorType, uint8_t slaveAddress, ui
 
     if(_motor_sync(motorID))
     {
-        _motors[motorID].state = STATE_MOTOR_ERROR;
+        _motors[motorID].state = MOTOR_STATUS_ERROR;
         printf("motor_init: sync error, id:%d \n\r", motorID);
     }
     else
     {
-        _motors[motorID].state = STATE_MOTOR_OK;
+        _motors[motorID].state = MOTOR_STATUS_IDLE;
         char str[10];
         //get initial senzor data
         _motors[motorID].init_pos = _motor_read_raw(motorID);
@@ -229,6 +229,12 @@ float motor_get_abs(uMotorID motorID)
 
 sMotorState motor_get_status(uMotorID motorID)
 {
+
+    if(_motors[motorID].motorType == TYPE_MOTOR_TWI)
+    {
+        _motors[motorID].state =  motor_get_status_twi(_motors[motorID].slaveAddress);
+
+    }
     return _motors[motorID].state;
 }
 
@@ -251,7 +257,7 @@ void motor_one_step(uMotorID motorID, uint8_t dir)
 
 float motor_read_angle(uMotorID motorID)
 {
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_read_angle: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return 0;
@@ -271,7 +277,7 @@ float motor_read_angle(uMotorID motorID)
 
 int motor_read_position(uMotorID motorID)
 {
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_read_position: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return 0;
@@ -281,7 +287,7 @@ int motor_read_position(uMotorID motorID)
 
 void motor_sync(uMotorID motorID)
 {
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_sync: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
@@ -291,7 +297,7 @@ void motor_sync(uMotorID motorID)
 
 void motor_diagnoise(uMotorID motorID)
 {
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_diagnoise: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
@@ -301,7 +307,7 @@ void motor_diagnoise(uMotorID motorID)
 
 void motor_printout(uMotorID motorID)
 {
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   printf("motor_printout: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
     }
@@ -324,7 +330,7 @@ void motor_set_angle(uMotorID motorID, float angle)
 
 void motor_calibrate(uMotorID motorID) { 
 
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_calibrate: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
@@ -533,7 +539,7 @@ void motor_calibrate(uMotorID motorID) {
 void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
 {
 
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_calibrate: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
@@ -558,7 +564,7 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
 void motor_set_power(uMotorID motorID, float power, unsigned char motor_config)
 {
     int ret = 0;
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_set_power: motor %d is not online, state= %d \n\r", motorID,  _motors[motorID].state);
         return;
@@ -573,7 +579,7 @@ void motor_set_power(uMotorID motorID, float power, unsigned char motor_config)
 
 void motor_set_dir(uMotorID motorID, uint8_t dir)
 {
-    if(STATE_MOTOR_OK != _motors[motorID].state)
+    if((MOTOR_STATUS_UNKNOWN == _motors[motorID].state) ||  (_motors[motorID].state == MOTOR_STATUS_ERROR))
     {   
         printf("motor_calibrate: motor is not online, state= %d \n\r",  _motors[motorID].state);
         return;
@@ -618,7 +624,7 @@ void motor_task()
 
     for(int i = MOTOR_0; i < MOTOR_COUNT; i+=2) //filter only dir motors
     {
-        if(_motors[i].state == STATE_MOTOR_OK)
+        if((_motors[i].state != MOTOR_STATUS_ERROR) && (_motors[i].state != MOTOR_STATUS_UNKNOWN))
         {
             //read current angle
             _motors[i].angle = motor_read_angle(i);
@@ -749,7 +755,7 @@ void motor_task()
         //printout stats for motors
         for(int i = MOTOR_0; i < MOTOR_COUNT; i++)
         {
-            if(_motors[i].state == STATE_MOTOR_OK)
+            if((_motors[i].state != MOTOR_STATUS_ERROR) && (_motors[i].state != MOTOR_STATUS_UNKNOWN))
             {
                // snprintf(str, sizeof(str), "%f", _motors[i].angular_speed);
                // printf("ID: %d, as:%s", i, str);

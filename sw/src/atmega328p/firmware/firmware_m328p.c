@@ -21,13 +21,15 @@ volatile int timer_timer_trigger = 0;
 volatile int timer_led_count = 0;
 volatile int timer_sensor_count = 0;
 volatile int timer_firmware_exec_count = 0;
+volatile int timer_switch_count = 0;
+
 ISR(TIMER1_COMPA_vect)
 {
     
     timer_led_count++;
     timer_sensor_count++;
     timer_firmware_exec_count++;
-    
+    timer_switch_count++;
 }
 
 
@@ -157,6 +159,10 @@ int main()
     SLP_PORT |= 1 << SLP_PIN;
     DIR_PORT |= 1 << DIR_PIN;
 
+    //configure input, pull down resitor is on PCB
+    SWITCH_DDR &= ~(1 << SWITCH_PIN);
+    
+
     magnetic_sensor_diag();
 
     /*enable global interrupts*/
@@ -164,9 +170,13 @@ int main()
     uint16_t steps_to_do = 0;
     uint16_t step_wait = 0;
     uint8_t free_running = 0;
+    uint8_t force_stop = 0;
     uint8_t invalid_cmd = 0;
+    uint8_t switch_press_threshold = 0;
+    uint8_t switch_release_threshold = 0;
     unsigned char print_msg[10];
     twi_data.firmware_cmd = CMD_FIRMWARE_NONE;
+    twi_data.motor_data.status = MOTOR_STATUS_IDLE;
 
     DDRB |= 1 << PINB2;
 
@@ -199,6 +209,7 @@ int main()
                 free_running = 0;
                 invalid_cmd = 0;
                 steps_to_do = twi_data.motor_data.steps;
+                
             }
             else if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CCW)
             {
@@ -248,6 +259,7 @@ int main()
             
             if(!invalid_cmd)
             {
+                twi_data.motor_data.status = MOTOR_STATUS_BUSY;
                 firmware_hw328p_set_pwm_0(100);
                 timer_led_count = 0;
                 step_wait = (RPM_CONST / (uint16_t)twi_data.motor_data.rpm);
@@ -272,6 +284,7 @@ int main()
                 //update txbuffer
                 txbuffer[TWI_TX_ADDR_SENSOR_RAW] = (twi_data.sensor_data.raw_value & 0xFF00) >> 8;
                 txbuffer[TWI_TX_ADDR_SENSOR_RAW+1] = twi_data.sensor_data.raw_value & 0x00FF;
+                txbuffer[TWI_TX_ADDR_MOTOR_STATUS] = twi_data.motor_data.status;
                 sei();
 
                 //debug
@@ -302,7 +315,13 @@ int main()
 
         if(timer_timer_trigger)
         {
-            if(free_running)
+            if(force_stop)
+            {
+                firmware_hw328p_timer_stop_B();
+                steps_to_do = 0;
+                free_running = 0;
+            }
+            else if(free_running)
             {
                 STEP_PORT |= 1 << STEP_PIN;
                 _delay_us(5);
@@ -317,10 +336,43 @@ int main()
             }
             else
             {
+                twi_data.motor_data.status = MOTOR_STATUS_IDLE;
                 firmware_hw328p_timer_stop_B();
             }
             timer_timer_trigger = 0;
             
+        }
+
+        //10 ms
+        if(timer_switch_count >= 10)
+        {
+            if( ((SWITCH_OUTP >> SWITCH_PIN) & 0x1) && (switch_press_threshold < 10))
+            {
+                switch_press_threshold++;
+            }
+            else if((((SWITCH_OUTP >> SWITCH_PIN) & 0x1) == 0) && switch_release_threshold < 10)
+            {
+                switch_release_threshold++;
+            }
+
+            timer_switch_count = 0;
+        }
+
+        if(switch_release_threshold >= 10){
+            firmware_hw328p_set_pwm_0(0);
+            switch_press_threshold = 0;
+            switch_release_threshold = 0;
+            force_stop = 0;
+            if(twi_data.motor_data.status == MOTOR_STATUS_ENDSTOP)
+                twi_data.motor_data.status = MOTOR_STATUS_IDLE;
+        }
+        else if(switch_press_threshold >=  10)
+        {
+            firmware_hw328p_set_pwm_0(100);
+            force_stop = 1;
+            timer_led_count = 0;
+            //set error state as limit reach for TWI comm
+            twi_data.motor_data.status = MOTOR_STATUS_ENDSTOP;
         }
 
         if(timer_led_count >= 10)
