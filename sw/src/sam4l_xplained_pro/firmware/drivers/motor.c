@@ -13,13 +13,13 @@ const float angle_step_conv = 360.0 / ((float)MOTOR_SPR * (float)MOTOR_MICROSTEP
 
 const float startup_angle[MOTOR_COUNT] = 
 {
-    211.0,
+    327.0,
     0,
-    316.68,
+    315.68,
     0,
-    57.9,
+    100.9,
     0,
-    120.32,
+    202.32,
     0
 };
 
@@ -110,8 +110,15 @@ static inline int _motor_set_power(uMotorID motorID, float power, unsigned char 
     }
     else if(_motors[motorID].motorType == TYPE_MOTOR_TWI)
     {
-        printf("_motor_read_raw: error, TWI version doesn't support dynamic power setup! \n\r");
-        return -1;
+        if(motor_config == 0xFA) /*turn off motors*/
+        {
+            return motor_power_off(_motors[motorID].slaveAddress);
+        }
+        else
+        {
+            printf("_motor_read_raw: error, TWI version doesn't support dynamic power setup! \n\r");
+            return -1;
+        }
     }
     else
     {

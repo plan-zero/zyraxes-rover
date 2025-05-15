@@ -120,7 +120,14 @@ int motor_sync_twi(uint8_t address)
 uint16_t motor_micro_step_twi(uint8_t address, uint8_t dir, uint16_t steps, uint8_t rpm)
 {
     status_code_t status = STATUS_OK;
-    firmware_tx_data[TWI_RX_ADDR_CMD] = CMD_MOTOR_STEP_CCW - dir;
+    if (steps == 0x1fff)
+    {
+      firmware_tx_data[TWI_RX_ADDR_CMD] = CMD_MOTOR_RUN_CW + dir;
+    }
+    else
+    {
+      firmware_tx_data[TWI_RX_ADDR_CMD] = CMD_MOTOR_STEP_CW + dir;
+    }
     firmware_tx_data[TWI_RX_ADDR_STEPS] = steps >> 8;
     firmware_tx_data[TWI_RX_ADDR_STEPS + 1] = steps;
     firmware_tx_data[TWI_RX_ADDR_RPM] = rpm;
@@ -165,3 +172,17 @@ int motor_get_status_twi(uint8_t address)
     return firmware_rx_data[TWI_TX_ADDR_MOTOR_STATUS];
 }
 
+int motor_power_off(uint8_t address)
+{
+  status_code_t status = STATUS_OK;
+  firmware_tx_data[TWI_RX_ADDR_CMD] = CMD_MOTOR_POWEROFF;
+
+  status = _twi_write_package(address, TWI_RX_ADDR_CMD, TWI_RX_ADDR_CMD, 1);
+  if(status != STATUS_OK){
+      printf("motor_micro_step_twi: comm error, %d \n\r", status);
+      return 1;
+  }
+
+  return 0;
+
+}
