@@ -132,7 +132,7 @@ static inline int mod(int xMod, int mMod) {
 }
 
 
-void motor_init(uMotorID motorID, sMotorType motorType, uint8_t slaveAddress, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox)
+void motor_init(uMotorID motorID, sMotorType motorType, uint8_t slaveAddress, uint8_t motorPCs, uint8_t sensorPCs, uint8_t go_zero, float gearbox, uint8_t toogle_dir)
 {
     if(motorType == TYPE_MOTOR_SPI)
         printf("motor_init: Initialize motor ID=%d, PCs selected driver %d senzor %d... \n\r", motorID, motorPCs, sensorPCs);
@@ -151,6 +151,7 @@ void motor_init(uMotorID motorID, sMotorType motorType, uint8_t slaveAddress, ui
     _motors[motorID].idle = 1;
     _motors[motorID].motorType = motorType;
     _motors[motorID].slaveAddress = slaveAddress;
+    _motors[motorID].toggle_dir = toogle_dir;
 
     printf("motor_init: sync with motor driver, sending... \n\r");
 
@@ -558,7 +559,15 @@ void motor_set_rpm(uMotorID motorID, uint8_t dir, uint32_t RPM)
     microstep_wait = MINUTE_TO_US / (RPM * MOTOR_MICROSTEP_CONFIG * MOTOR_SPR);
     //printf("motor_set_rpm: desired RPM: %d, calulated value microstep us: %d \n\r", RPM, microstep_wait);
 
-    _motors[motorID].dir = dir;
+    if(_motors[motorID].toggle_dir)
+    {
+        if(dir == MOTOR_FORWARD)
+            _motors[motorID].dir = MOTOR_REVERSE;
+        else
+            _motors[motorID].dir = MOTOR_FORWARD;
+    }
+    else
+        _motors[motorID].dir = dir;
     _motors[motorID].RPM = RPM;
     _motors[motorID].us_per_microstep = microstep_wait;
 
@@ -592,7 +601,15 @@ void motor_set_dir(uMotorID motorID, uint8_t dir)
         return;
     }
 
-    _motors[motorID].dir = dir;
+    if(_motors[motorID].toggle_dir)
+    {
+        if(dir == MOTOR_FORWARD)
+            _motors[motorID].dir = MOTOR_REVERSE;
+        else
+            _motors[motorID].dir = MOTOR_FORWARD;
+    }
+    else
+        _motors[motorID].dir = dir;
 
 }
 
