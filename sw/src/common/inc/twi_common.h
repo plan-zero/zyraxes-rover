@@ -9,7 +9,8 @@ typedef enum{
     CMD_MOTOR_RUN_CCW = 0x4,
     CMD_MOTOR_STOP = 0x5,
     CMD_MOTOR_POWEROFF = 0x6,
-    CMD_MOTOR_SYNC = 0x7
+    CMD_MOTOR_SYNC = 0x7,
+    CMD_MOTOR_RELEASE = 0x8
 }MasterCMD;
 
 typedef enum{
@@ -17,7 +18,8 @@ typedef enum{
     MOTOR_STATUS_ERROR = 1,
     MOTOR_STATUS_IDLE = 2,
     MOTOR_STATUS_BUSY = 3,
-    MOTOR_STATUS_ENDSTOP = 4,
+    MOTOR_STATUS_ENDSTOP_1 = 4,
+    MOTOR_STATUS_ENDSTOP_2 = 5,
     MOTOR_STATUS_COUNT
 }sMotorState;
 

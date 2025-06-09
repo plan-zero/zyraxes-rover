@@ -171,6 +171,7 @@ int main()
     uint16_t step_wait = 0;
     uint8_t free_running = 0;
     uint8_t force_stop = 0;
+    uint8_t force_release = 0;
     uint8_t invalid_cmd = 0;
     uint8_t switch_press_threshold = 0;
     uint8_t switch_release_threshold = 0;
@@ -252,6 +253,16 @@ int main()
                 SLP_PORT &= ~(1 << SLP_PIN);
                 invalid_cmd = 0;
             }
+            else if(twi_data.motor_data.cmd == CMD_MOTOR_RELEASE)
+            {
+                //set the oposite direction
+                if(force_stop)
+                {
+                    DIR_PORT ^= (1 << DIR_PIN);
+                    force_release = 1;
+                    twi_data.motor_data.rpm = 40;
+                }
+            }
             else
             {
                 invalid_cmd = 1;
@@ -317,9 +328,19 @@ int main()
         {
             if(force_stop)
             {
-                firmware_hw328p_timer_stop_B();
+                
                 steps_to_do = 0;
                 free_running = 0;
+                if(force_release)
+                {
+                    STEP_PORT |= 1 << STEP_PIN;
+                    _delay_us(5);
+                    STEP_PORT &= ~(1 << STEP_PIN);
+                }
+                else
+                {
+                    firmware_hw328p_timer_stop_B();
+                }
             }
             else if(free_running)
             {
@@ -363,16 +384,22 @@ int main()
             switch_press_threshold = 0;
             switch_release_threshold = 0;
             force_stop = 0;
-            if(twi_data.motor_data.status == MOTOR_STATUS_ENDSTOP)
+            force_release = 0;
+            if((twi_data.motor_data.status == MOTOR_STATUS_ENDSTOP_1) 
+            || (twi_data.motor_data.status == MOTOR_STATUS_ENDSTOP_2))
+            {
                 twi_data.motor_data.status = MOTOR_STATUS_IDLE;
+            }
         }
         else if(switch_press_threshold >=  10)
         {
             firmware_hw328p_set_pwm_0(100);
             force_stop = 1;
             timer_led_count = 0;
+            
             //set error state as limit reach for TWI comm
-            twi_data.motor_data.status = MOTOR_STATUS_ENDSTOP;
+            //set the LSB bit to 1 if DIR is pin is HIGH, this will send status 4 or 5 (ENDSTOP1 or ENDSTOP2)
+            twi_data.motor_data.status = MOTOR_STATUS_ENDSTOP_1 | ((DIR_PORT >> DIR_PIN) & 1);
         }
 
         if(timer_led_count >= 10)

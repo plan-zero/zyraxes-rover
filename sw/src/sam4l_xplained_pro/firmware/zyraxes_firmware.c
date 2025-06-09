@@ -529,7 +529,7 @@ int main(void)
 				printf("TWI switch address %x \n\r", twi_selected_chip);
 			    break;
 			case '-':
-				if(twi_testing_cmd < 0x7)
+				if(twi_testing_cmd < 0x8)
 					twi_testing_cmd++;
 				else
 					twi_testing_cmd = 0x1;
