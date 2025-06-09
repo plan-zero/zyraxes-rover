@@ -202,70 +202,75 @@ int main()
             sei();
 
             
-
-            if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CW)
+            if(!force_stop)
             {
-                SLP_PORT |= (1 << SLP_PIN);
-                DIR_PORT |= 1 << DIR_PIN;
-                free_running = 0;
-                invalid_cmd = 0;
-                steps_to_do = twi_data.motor_data.steps;
-                
-            }
-            else if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CCW)
-            {
-                SLP_PORT |= (1 << SLP_PIN);
-                DIR_PORT &= ~(1 << DIR_PIN);
-                free_running = 0;
-                invalid_cmd = 0;
-                steps_to_do = twi_data.motor_data.steps;
-            }
-            else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CW)
-            {
-                SLP_PORT |= (1 << SLP_PIN);
-                DIR_PORT |= 1 << DIR_PIN;
-                free_running = 1;
-                invalid_cmd = 0;
-                steps_to_do = 0;
-            }
-            else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CCW)
-            {
-                SLP_PORT |= (1 << SLP_PIN);
-                DIR_PORT &= ~(1 << DIR_PIN);
-                free_running = 1;
-                invalid_cmd = 0;
-                steps_to_do = 0;
-            }
-            else if(twi_data.motor_data.cmd == CMD_MOTOR_STOP)
-            {
-                SLP_PORT |= (1 << SLP_PIN);
-                free_running = 0;
-                steps_to_do = 0;
-                firmware_hw328p_timer_stop_B();
-                
-                invalid_cmd = 0;
-            }
-            else if(twi_data.motor_data.cmd == CMD_MOTOR_POWEROFF)
-            {
-                steps_to_do = 0;
-                free_running = 0;
-                firmware_hw328p_timer_stop_B();
-                SLP_PORT &= ~(1 << SLP_PIN);
-                invalid_cmd = 0;
-            }
-            else if(twi_data.motor_data.cmd == CMD_MOTOR_RELEASE)
-            {
-                //set the oposite direction
-                if(force_stop)
+                if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CW)
                 {
-                    DIR_PORT ^= (1 << DIR_PIN);
-                    force_release = 1;
-                    twi_data.motor_data.rpm = 40;
+                    SLP_PORT |= (1 << SLP_PIN);
+                    DIR_PORT |= 1 << DIR_PIN;
+                    free_running = 0;
+                    invalid_cmd = 0;
+                    steps_to_do = twi_data.motor_data.steps;
+                    
+                }
+                else if(twi_data.motor_data.cmd == CMD_MOTOR_STEP_CCW)
+                {
+                    SLP_PORT |= (1 << SLP_PIN);
+                    DIR_PORT &= ~(1 << DIR_PIN);
+                    free_running = 0;
+                    invalid_cmd = 0;
+                    steps_to_do = twi_data.motor_data.steps;
+                }
+                else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CW)
+                {
+                    SLP_PORT |= (1 << SLP_PIN);
+                    DIR_PORT |= 1 << DIR_PIN;
+                    free_running = 1;
+                    invalid_cmd = 0;
+                    steps_to_do = 0;
+                }
+                else if(twi_data.motor_data.cmd == CMD_MOTOR_RUN_CCW)
+                {
+                    SLP_PORT |= (1 << SLP_PIN);
+                    DIR_PORT &= ~(1 << DIR_PIN);
+                    free_running = 1;
+                    invalid_cmd = 0;
+                    steps_to_do = 0;
+                }
+                else if(twi_data.motor_data.cmd == CMD_MOTOR_STOP)
+                {
+                    SLP_PORT |= (1 << SLP_PIN);
+                    free_running = 0;
+                    steps_to_do = 0;
+                    firmware_hw328p_timer_stop_B();
+                    
+                    invalid_cmd = 0;
+                }
+                else if(twi_data.motor_data.cmd == CMD_MOTOR_POWEROFF)
+                {
+                    steps_to_do = 0;
+                    free_running = 0;
+                    firmware_hw328p_timer_stop_B();
+                    SLP_PORT &= ~(1 << SLP_PIN);
+                    invalid_cmd = 0;
+                }
+                else
+                {
+                    invalid_cmd = 1;
                 }
             }
             else
             {
-                invalid_cmd = 1;
+                if(twi_data.motor_data.cmd == CMD_MOTOR_RELEASE)
+                {
+                    //set the oposite direction
+                    if(force_stop)
+                    {
+                        DIR_PORT ^= (1 << DIR_PIN);
+                        force_release = 1;
+                        twi_data.motor_data.rpm = 40;
+                    }
+                }
             }
             
             if(!invalid_cmd)
